@@ -1,1 +1,0 @@
-V16.3: Bỏ ô thêm từng tên nhân viên; giữ ô nhập nhiều tên và đổi nút thành "Thêm". Nhập một tên hoặc nhiều tên, mỗi người một dòng. Chỉ cần cập nhật admin.html và admin.js trên GitHub. Không cần chạy SQL.
