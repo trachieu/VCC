@@ -15,7 +15,33 @@ function renderAdminMenu(){let id=$('menuRestaurant').value;$('menuAdminList').i
 function bindAdminButtons(){for(let table of [['member','members'],['rest','restaurants'],['menu','menu_items']]){let [short,name]=table;document.querySelectorAll(`[data-remove-${short}]`).forEach(b=>b.onclick=()=>change(name,b.dataset['remove'+short[0].toUpperCase()+short.slice(1)],{active:false},'Xóa khỏi danh sách?'));document.querySelectorAll(`[data-edit-${short}]`).forEach(b=>b.onclick=async()=>{let id=b.dataset['edit'+short[0].toUpperCase()+short.slice(1)],obj=({members,restaurants,menu_items:menu})[name].find(x=>x.id===id);if(!obj)return;let patch={};if(short==='menu'){let n=prompt('Tên món',obj.name);if(n===null)return;let p=prompt('Giá M (đ)',obj.price_m);if(p===null)return;let l=prompt('Giá L (để trống nếu không có)',obj.price_l??'');if(l===null)return;patch={name:n.trim(),price_m:Number(p),price_l:l.trim()?Number(l):null};if(!n.trim()||!Number.isFinite(patch.price_m)||patch.price_m<0||patch.price_l!==null&&(!Number.isFinite(patch.price_l)||patch.price_l<0))return notify('Giá không hợp lệ',true)}else{let n=prompt('Tên mới',obj.name);if(!n?.trim())return;patch={name:n.trim()}}await change(name,id,patch)})}}
 async function change(table,id,patch,message){if(message&&!confirm(message))return;try{let{error}=await sb.from(table).update(patch).eq('id',id);if(error)throw error;await reloadAdmin();notify('Đã cập nhật')}catch(e){notify(e.message,true)}}
 async function add(table,record,clearIds=[]){try{let{error}=await sb.from(table).insert(record);if(error)throw error;clearIds.forEach(id=>$(id).value='');await reloadAdmin();notify('Đã thêm')}catch(e){notify(e.message,true)}}
-$('addMember').onclick=()=>{let n=$('memberName').value.trim();if(n)add('members',{name:n},['memberName'])};$('addRestaurant').onclick=()=>{let n=$('restaurantName').value.trim();if(n)add('restaurants',{name:n},['restaurantName'])};$('addMenu').onclick=()=>{let name=$('menuName').value.trim(),p=$('priceM').value,l=$('priceL').value;if(!name||!p||Number(p)<0||l!==''&&Number(l)<0)return notify('Nhập tên và giá hợp lệ',true);add('menu_items',{restaurant_id:$('menuRestaurant').value,name,category:$('menuCategory').value.trim()||'Khác',price_m:Number(p),price_l:l===''?null:Number(l)},['menuName','menuCategory','priceM','priceL'])};
+$('addMember').onclick=()=>{let n=$('memberName').value.trim();if(n)add('members',{name:n},['memberName'])};
+// Nhập nhiều thành viên: mỗi dòng một tên, bỏ qua tên đã có (kể cả không dấu).
+function memberKey(name){return norm(name).replace(/\s+/g,' ').trim()}
+$('bulkAddMembers').onclick=async()=>{
+ const button=$('bulkAddMembers'), box=$('bulkMemberNames'), result=$('bulkMemberResult');
+ const names=box.value.split(/\r?\n/).map(x=>x.trim().replace(/\s+/g,' ')).filter(Boolean);
+ if(!names.length)return notify('Hãy dán danh sách tên, mỗi người một dòng',true);
+ const existing=new Set(members.filter(x=>x.active).map(x=>memberKey(x.name)));
+ const inactiveByName=new Map(members.filter(x=>!x.active).map(x=>[memberKey(x.name),x]));
+ const seen=new Set(),insert=[],reactivate=[];
+ for(const name of names){const key=memberKey(name);if(!key||seen.has(key)||existing.has(key))continue;seen.add(key);if(inactiveByName.has(key))reactivate.push(inactiveByName.get(key));else insert.push({name})}
+ const skipped=names.length-insert.length-reactivate.length;
+ if(!insert.length&&!reactivate.length){result.textContent=`Đã bỏ qua ${skipped} tên có sẵn/trùng.`;return}
+ button.disabled=true;result.textContent='Đang thêm...';
+ let added=0,restored=0,errors=[];
+ try{
+  // Giới hạn mỗi đợt để danh sách dài không gây lỗi kích thước yêu cầu.
+  for(let i=0;i<insert.length;i+=100){let chunk=insert.slice(i,i+100);let {error}=await sb.from('members').insert(chunk);if(error){errors.push(error.message);break}added+=chunk.length}
+  for(const person of reactivate){let {error}=await sb.from('members').update({active:true}).eq('id',person.id);if(error){errors.push(error.message);break}restored++}
+  await reloadAdmin();
+  const remainder=[...insert.slice(added).map(x=>x.name),...reactivate.slice(restored).map(x=>x.name)];
+  box.value=remainder.join('\n');
+  result.textContent=`Đã thêm ${added}, khôi phục ${restored}, bỏ qua ${skipped}.`+(errors.length?' Có lỗi: '+errors.join('; '):'');
+  notify(result.textContent,errors.length>0);
+ }catch(e){notify(e.message,true)}finally{button.disabled=false}
+};
+$('addRestaurant').onclick=()=>{let n=$('restaurantName').value.trim();if(n)add('restaurants',{name:n},['restaurantName'])};$('addMenu').onclick=()=>{let name=$('menuName').value.trim(),p=$('priceM').value,l=$('priceL').value;if(!name||!p||Number(p)<0||l!==''&&Number(l)<0)return notify('Nhập tên và giá hợp lệ',true);add('menu_items',{restaurant_id:$('menuRestaurant').value,name,category:$('menuCategory').value.trim()||'Khác',price_m:Number(p),price_l:l===''?null:Number(l)},['menuName','menuCategory','priceM','priceL'])};
 $('newRound').onclick=async()=>{if(current)return notify('Hãy kết thúc đợt hiện tại trước',true);let name=$('roundName').value.trim();if(name)await add('order_rounds',{name,status:'open'},['roundName'])};$('toggleLock').onclick=()=>current&&change('order_rounds',current.id,{status:current.status==='open'?'locked':'open'});$('archiveRound').onclick=()=>current&&change('order_rounds',current.id,{status:'archived'},'Kết thúc đợt này? Lịch sử sẽ không sửa được.');$('refreshOrders').onclick=reloadAdmin;
 function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'',Mon:formatItems(o.items),Tong_tien:o.total,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}
 $('exportOrders').onclick=()=>exportCsv(rowsFor(orders.filter(o=>o.round_id===current?.id)),'don-hien-tai.csv');$('exportArchive').onclick=()=>exportCsv(rowsFor(orders.filter(o=>history.some(r=>r.id===o.round_id))),'lich-su.csv');
