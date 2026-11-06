@@ -1,0 +1,17 @@
+V16.6 – Thêm món theo danh mục
+
+GitHub: chỉ thay admin.html, admin.js, index.html, member.js.
+Không cần chạy thêm SQL. Giữ config.js đang dùng.
+
+Quản trị → Quản lý món ăn → Chọn quán → Dán:
+[TRÀ SỮA]
+Trà sữa A | 25000 | 30000
+Trà sữa B | 30000 | 35000
+
+[ĐÁ XAY]
+Matcha đá xay | 35000 | 40000
+
+[TRÀ TRÁI CÂY]
+Trà đào | 25000 | 30000
+
+Nhấn Thêm. Mỗi món phải có cả giá M và L. Tên trùng trong cùng quán sẽ được bỏ qua.

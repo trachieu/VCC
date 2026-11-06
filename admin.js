@@ -40,7 +40,39 @@ $('bulkAddMembers').onclick=async()=>{
   notify(result.textContent,errors.length>0);
  }catch(e){notify(e.message,true)}finally{button.disabled=false}
 };
-$('addRestaurant').onclick=()=>{let n=$('restaurantName').value.trim();if(n)add('restaurants',{name:n},['restaurantName'])};$('addMenu').onclick=()=>{let name=$('menuName').value.trim(),p=$('priceM').value,l=$('priceL').value;if(!name||!p||Number(p)<0||l!==''&&Number(l)<0)return notify('Nhập tên và giá hợp lệ',true);add('menu_items',{restaurant_id:$('menuRestaurant').value,name,category:$('menuCategory').value.trim()||'Khác',price_m:Number(p),price_l:l===''?null:Number(l)},['menuName','menuCategory','priceM','priceL'])};
+$('addRestaurant').onclick=()=>{let n=$('restaurantName').value.trim();if(n)add('restaurants',{name:n},['restaurantName'])};
+
+
+// Thêm món theo danh mục, mỗi dòng: Tên món | Giá M | Giá L.
+$('addBulkMenu').onclick=async()=>{
+ const input=$('bulkMenuText'),button=$('addBulkMenu'),result=$('bulkMenuResult');
+ const restaurantId=$('menuRestaurant').value;
+ if(!restaurantId)return notify('Chọn quán trước',true);
+ const lines=input.value.split(/\r?\n/);let category='',items=[],problems=[];
+ const normalizeName=x=>norm(x).replace(/\s+/g,' ').trim();
+ const existing=new Set(menu.filter(x=>x.restaurant_id===restaurantId&&x.active).map(x=>normalizeName(x.name)));
+ const seen=new Set();let skipped=0;
+ for(let idx=0;idx<lines.length;idx++){
+   const line=lines[idx].trim();if(!line)continue;
+   const heading=line.match(/^\[(.+)\]$/);
+   if(heading){category=heading[1].trim();if(!category)problems.push(`Dòng ${idx+1}: danh mục rỗng`);continue}
+   const parts=line.split('|').map(x=>x.trim());
+   if(!category||parts.length!==3||!parts[0]||!/^\d+$/.test(parts[1])||!/^\d+$/.test(parts[2])){problems.push(`Dòng ${idx+1}: ${line}`);continue}
+   const m=Number(parts[1]),l=Number(parts[2]);
+   if(!Number.isSafeInteger(m)||!Number.isSafeInteger(l)||m<0||l<0){problems.push(`Dòng ${idx+1}: giá không hợp lệ`);continue}
+   const key=normalizeName(parts[0]);
+   if(existing.has(key)||seen.has(key)){skipped++;continue}
+   seen.add(key);items.push({restaurant_id:restaurantId,name:parts[0],category,price_m:m,price_l:l});
+ }
+ if(problems.length){result.textContent=`Có ${problems.length} dòng chưa đúng. Hãy sửa rồi thêm lại. ${problems.slice(0,3).join('; ')}`;return notify(result.textContent,true)}
+ if(!items.length){result.textContent=`Không có món mới (${skipped} món đã có/trùng).`;return}
+ button.disabled=true;let added=0;
+ try{
+   for(let i=0;i<items.length;i+=75){const chunk=items.slice(i,i+75);const {error}=await sb.from('menu_items').insert(chunk);if(error)throw error;added+=chunk.length}
+   input.value='';await reloadAdmin();$('menuRestaurant').value=restaurantId;renderAdminMenu();
+   result.textContent=`Đã thêm ${added} món, bỏ qua ${skipped} món trùng.`;notify(result.textContent);
+ }catch(e){result.textContent=`Đã thêm ${added}/${items.length} món. ${e.message}`;notify(result.textContent,true)}finally{button.disabled=false}
+};
 
 function renderToppings(){const restaurantId=$('toppingRestaurant').value;$('toppingAdminList').innerHTML=toppingOptions.filter(t=>t.restaurant_id===restaurantId&&t.active).sort((a,b)=>a.name.localeCompare(b.name,'vi')).map(t=>`<div class="item row spread"><span>${safe(t.name)} · ${money(t.price)}</span><span><button class="secondary mini" data-edit-top="${t.id}">Sửa</button> <button class="danger mini" data-remove-top="${t.id}">Xóa</button></span></div>`).join('')||'<p class="muted">Quán chưa có topping.</p>';document.querySelectorAll('[data-edit-top]').forEach(b=>b.onclick=async()=>{const t=toppingOptions.find(x=>x.id===b.dataset.editTop);if(!t)return;const name=prompt('Tên topping',t.name);if(name===null)return;const price=prompt('Giá topping (đ)',t.price);if(price===null)return;if(!name.trim()||price.trim()===''||!Number.isSafeInteger(Number(price))||Number(price)<0)return notify('Thông tin topping không hợp lệ',true);await change('toppings',t.id,{name:name.trim(),price:Number(price)})});document.querySelectorAll('[data-remove-top]').forEach(b=>b.onclick=()=>change('toppings',b.dataset.removeTop,{active:false},'Xóa topping này khỏi menu?'))}
 $('toppingRestaurant').onchange=renderToppings;

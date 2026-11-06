@@ -1,0 +1,11 @@
+V16.5 - THANH TOAN THEO NUT
+
+Thay duy nhất member.js trong repository GitHub VCC bằng member.js của bản này.
+Khong can chay SQL. Giu nguyen config.js dang ket noi du an Supabase cua ban.
+
+- Xac nhan dat hang: chi luu don va chuyen sang danh sach don, khong tu mo QR.
+- Bam nut "Thanh toan" tren don: hien QR voi so tien do Supabase da luu.
+- Noi dung chuyen khoan: <Ten nhan vien> chuyen khoan.
+- Quan tri van xac nhan da nhan tien theo cach thu cong.
+
+Chu y: Khi nhan vien chon ten nguoi khac, noi dung QR se theo ten da duoc chon cho don. Can doi chieu truoc khi chuyen tien.

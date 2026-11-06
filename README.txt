@@ -21,3 +21,5 @@ CHÚ Ý:
 - Topping hiện đang dùng giá cố định 5.000đ hoặc 7.000đ.
 - CSV có thể mở bằng Excel; không phải tệp .xlsx.
 - Nếu xuất bản trên GitHub công khai, cần thêm chống spam/rate limit/CAPTCHA trước khi dùng chính thức.
+
+V16.1: Admin có ô thêm tên hàng loạt, mỗi dòng một tên. Để cập nhật web đã triển khai, thay admin.html và admin.js trên GitHub; config.js trong gói đã đặt đúng dự án hiện tại.
