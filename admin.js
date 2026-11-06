@@ -2,7 +2,35 @@ let members=[],restaurants=[],menu=[],toppingOptions=[],rounds=[],orders=[],curr
 async function checkAdmin(){let {data:{user}}=await sb.auth.getUser();if(!user||user.is_anonymous)return false;let {data,error}=await sb.from('profiles').select('role,active').eq('id',user.id).single();return !error&&data?.role==='admin'&&data.active}
 async function start(){try{if(await checkAdmin()){showDashboard()}else{await sb.auth.signOut();$('login').classList.remove('hidden')}}catch(e){notify(e.message,true)}}
 async function showDashboard(){$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');$('logout').classList.remove('hidden');await reloadAdmin()}
-$('signIn').onclick=async()=>{let email=$('email').value.trim(),password=$('password').value;if(!email||!password)return notify('Nhập email và mật khẩu',true);$('signIn').disabled=true;try{let {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;if(!await checkAdmin())throw Error(onlyAdmin);await showDashboard()}catch(e){await sb.auth.signOut();notify(e.message,true)}finally{$('signIn').disabled=false}};
+// Hiển thị lỗi ngay tại form đăng nhập, không chỉ tại thông báo ở đầu trang.
+function loginFeedback(message){const el=$('loginFeedback');el.textContent=message||'';el.classList.toggle('hidden',!message)}
+function loginErrorMessage(err){
+ const m=String(err?.message||'').toLowerCase();
+ if(m.includes('invalid login credentials')||m.includes('invalid credentials'))return 'Email hoặc mật khẩu không đúng.';
+ if(m.includes('email not confirmed'))return 'Email chưa được xác nhận.';
+ if(m.includes('too many requests')||err?.status===429)return 'Bạn đã thử quá nhiều lần. Hãy thử lại sau.';
+ if(m.includes('failed to fetch')||m.includes('network')||m.includes('fetch'))return 'Không kết nối được. Kiểm tra Internet rồi thử lại.';
+ if(m.includes('anonymous sign-ins'))return 'Cấu hình đăng nhập Supabase chưa đúng.';
+ if(err?.message===onlyAdmin)return onlyAdmin;
+ return 'Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu.';
+}
+$('signIn').onclick=async()=>{
+ const email=$('email').value.trim(),password=$('password').value;
+ loginFeedback('');
+ if(!email||!password){loginFeedback('Vui lòng nhập email và mật khẩu.');return}
+ $('signIn').disabled=true;$('signIn').textContent='Đang đăng nhập…';
+ try{
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  if(!await checkAdmin())throw Error(onlyAdmin);
+  loginFeedback('');await showDashboard();
+ }catch(e){
+  loginFeedback(loginErrorMessage(e));
+  try{await sb.auth.signOut()}catch(_){}
+ }finally{$('signIn').disabled=false;$('signIn').textContent='Đăng nhập'}
+};
+['email','password'].forEach(id=>$(id).addEventListener('input',()=>loginFeedback('')));
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('signIn').click()});
 $('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
 async function reloadAdmin(){try{[members,restaurants,menu,toppingOptions,rounds,orders]=await Promise.all(['members','restaurants','menu_items','toppings','order_rounds','orders'].map(query));rounds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));current=rounds.find(x=>x.status!=='archived')||null;history=rounds.filter(x=>x.status==='archived');renderAdmin()}catch(e){notify(e.message,true)}}
 function renderAdmin(){$('roundState').textContent=current?`${current.name} · ${current.status==='open'?'Đang mở':'Đã khóa'}`:'Chưa có đợt hiện tại';$('toggleLock').disabled=!current; $('toggleLock').textContent=!current?'Chưa có đợt':current.status==='open'?'🔒 Khóa đơn':'🔓 Mở khóa';$('toggleLock').className=current?.status==='open'?'danger':'secondary';$('roundState').className='pill '+(current?.status==='open'?'state-open':current?.status==='locked'?'state-locked':'state-none');$('archiveRound').disabled=!current;let live=orders.filter(x=>x.round_id===current?.id),people=new Set(live.map(x=>x.member_id));let paid=live.filter(x=>x.paid).reduce((a,x)=>a+x.total,0),total=live.reduce((a,x)=>a+x.total,0);$('stats').innerHTML=[['Người đặt',people.size],['Số đơn',live.length],['Số món',live.reduce((a,x)=>a+(x.items||[]).reduce((b,y)=>b+y.qty,0),0)],['Tổng tiền',money(total)],['Đã thu',money(paid)],['Chưa thu',money(total-paid)]].map(([a,b])=>`<div class="card"><div class="muted">${a}</div><div class="summary">${b}</div></div>`).join('');
@@ -10,7 +38,7 @@ $('orderRows').innerHTML=live.sort((a,b)=>new Date(b.created_at)-new Date(a.crea
 $('memberList').innerHTML=members.filter(x=>x.active).sort((a,b)=>a.name.localeCompare(b.name,'vi')).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-member="${x.id}">Sửa</button> <button class="danger mini" data-remove-member="${x.id}">Xóa</button></span></div>`).join('');
 $('restaurantList').innerHTML=restaurants.filter(x=>x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-rest="${x.id}">Sửa</button> <button class="danger mini" data-remove-rest="${x.id}">Xóa</button></span></div>`).join('');
 $('menuRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderAdminMenu();$('toppingRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderToppings();
-$('archiveList').innerHTML=history.map(r=>`<div class="item">${safe(r.name)} · ${ts(r.archived_at)} · ${orders.filter(o=>o.round_id===r.id).length} đơn · ${money(orders.filter(o=>o.round_id===r.id).reduce((s,o)=>s+o.total,0))}</div>`).join('')||'<p class="muted">Chưa có lịch sử</p>';bindAdminButtons()}
+$('archiveList').innerHTML=history.map(r=>`<div class="item">${safe(r.name)} · ${ts(r.archived_at)} · ${orders.filter(o=>o.round_id===r.id).length} đơn · ${money(orders.filter(o=>o.round_id===r.id).reduce((s,o)=>s+o.total,0))} <button class="danger mini" data-delete-history="${r.id}">Xóa</button></div>`).join('')||'<p class="muted">Chưa có lịch sử</p>';bindAdminButtons();bindArchiveDelete()}
 function renderAdminMenu(){let id=$('menuRestaurant').value;$('menuAdminList').innerHTML=menu.filter(x=>x.restaurant_id===id&&x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)} (${safe(x.category)}) · M ${money(x.price_m)}${x.price_l!=null?' · L '+money(x.price_l):''}</span><span><button class="secondary mini" data-edit-menu="${x.id}">Sửa</button> <button class="danger mini" data-remove-menu="${x.id}">Xóa</button></span></div>`).join('')};$('menuRestaurant').onchange=renderAdminMenu;
 function bindAdminButtons(){for(let table of [['member','members'],['rest','restaurants'],['menu','menu_items']]){let [short,name]=table;document.querySelectorAll(`[data-remove-${short}]`).forEach(b=>b.onclick=()=>change(name,b.dataset['remove'+short[0].toUpperCase()+short.slice(1)],{active:false},'Xóa khỏi danh sách?'));document.querySelectorAll(`[data-edit-${short}]`).forEach(b=>b.onclick=async()=>{let id=b.dataset['edit'+short[0].toUpperCase()+short.slice(1)],obj=({members,restaurants,menu_items:menu})[name].find(x=>x.id===id);if(!obj)return;let patch={};if(short==='menu'){let n=prompt('Tên món',obj.name);if(n===null)return;let p=prompt('Giá M (đ)',obj.price_m);if(p===null)return;let l=prompt('Giá L (để trống nếu không có)',obj.price_l??'');if(l===null)return;patch={name:n.trim(),price_m:Number(p),price_l:l.trim()?Number(l):null};if(!n.trim()||!Number.isFinite(patch.price_m)||patch.price_m<0||patch.price_l!==null&&(!Number.isFinite(patch.price_l)||patch.price_l<0))return notify('Giá không hợp lệ',true)}else{let n=prompt('Tên mới',obj.name);if(!n?.trim())return;patch={name:n.trim()}}await change(name,id,patch)})}}
 async function change(table,id,patch,message){if(message&&!confirm(message))return;try{let{error}=await sb.from(table).update(patch).eq('id',id);if(error)throw error;await reloadAdmin();notify('Đã cập nhật')}catch(e){notify(e.message,true)}}
@@ -101,3 +129,31 @@ $('changeAdminPassword').onclick=async()=>{
   $('adminCurrentPassword').value='';$('adminNewPassword').value='';$('adminConfirmPassword').value='';button.disabled=false;
  }
 };
+
+// V16.10: Tabs quản trị. Không hiển thị các mục khác trong cùng lúc.
+const adminTabs=[...document.querySelectorAll('.admin-tab')];
+function openAdminTab(name){
+ document.querySelectorAll('[data-panel]').forEach(el=>el.classList.toggle('hidden',el.dataset.panel!==name));
+ adminTabs.forEach(b=>{const on=b.dataset.tab===name;b.classList.toggle('selected',on);b.setAttribute('aria-selected',String(on))});
+}
+adminTabs.forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
+// Lịch sử đã chốt chỉ được xóa qua RLS admin. Xóa đơn trước, sau đó xóa đợt.
+async function purgeArchive(roundIds){
+ if(!roundIds.length)return notify('Chưa có lịch sử để xóa');
+ if(!confirm(roundIds.length === history.length && history.length > 1 ? 'Bạn có muốn xóa toàn bộ lịch sử đặt hàng không?\nDữ liệu đã xóa không thể khôi phục.' : 'Bạn có muốn xóa lịch sử đợt đặt hàng này không?\nDữ liệu đã xóa không thể khôi phục.'))return;
+ try{
+  const {data:{user}}=await sb.auth.getUser();if(!user||!await checkAdmin())throw Error('Không có quyền quản trị');
+  for(const rid of roundIds){
+   // Xóa từng đợt riêng để kiểm tra số dòng thực sự đã xóa.
+   const {data:removed,error:e1}=await sb.from('orders').delete().eq('round_id',rid).select('id');if(e1)throw e1;
+   const {data:removedRound,error:e2}=await sb.from('order_rounds').delete().eq('id',rid).eq('status','archived').select('id');if(e2)throw e2;
+   if(!removedRound?.length)throw Error('Không xóa được đợt lịch sử. Kiểm tra SQL phân quyền.');
+  }
+  notify('Đã xóa lịch sử được chọn');await reloadAdmin();openAdminTab('history');
+ }catch(e){notify('Xóa lịch sử không thành công: '+e.message,true);await reloadAdmin()}
+}
+function bindArchiveDelete(){
+ document.querySelectorAll('[data-delete-history]').forEach(b=>b.onclick=()=>purgeArchive([b.dataset.deleteHistory]));
+ $('deleteAllHistory').disabled=!history.length;
+}
+$('deleteAllHistory').onclick=()=>purgeArchive(history.map(x=>x.id));

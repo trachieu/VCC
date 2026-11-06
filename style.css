@@ -12,3 +12,13 @@
 .account-head h2{margin:0 0 4px;font-size:23px}.account-head p{margin:0}.account-icon{width:50px;height:50px;display:grid;place-items:center;border-radius:15px;background:#e4f5e9;font-size:24px;flex-shrink:0}
 .password-form{display:grid;gap:14px;max-width:480px}.password-field{display:grid;gap:7px}.password-field label{font-weight:650;font-size:14px}.password-field input{width:100%;padding:14px 15px;border:1px solid #bfd7c7;border-radius:12px;background:#fff;transition:border-color .2s,box-shadow .2s}.password-field input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px #d7efe0}.password-save{width:100%;margin-top:6px;padding:15px 18px;border-radius:12px;font-size:15px}.password-feedback{margin:0;min-height:18px;font-size:14px;line-height:1.5;color:#206346;overflow-wrap:anywhere}
 @media(max-width:600px){.account-head h2{font-size:20px}.account-card{padding:18px}.account-head{gap:10px}.account-icon{width:44px;height:44px}}
+
+/* V16.9: Thông báo lỗi nằm ngay dưới form đăng nhập */
+.login-feedback{background:#fff0f0;color:#a32626;border:1px solid #f3bcbc;border-radius:10px;padding:12px 14px;margin:12px 0 0;font-size:14px;font-weight:600}
+
+/* V16.10 – các tab riêng trong quản trị */
+.admin-tabbar{display:flex;gap:9px;overflow-x:auto;position:sticky;top:0;z-index:5;padding:12px 0 14px;background:#f4f8f5;scrollbar-width:thin;margin-bottom:12px}
+.admin-tab{white-space:nowrap;background:#fff;color:#255743;border:1px solid #c7dfd0;border-radius:999px;padding:11px 17px;box-shadow:0 2px 10px #103d2e0a}
+.admin-tab.selected{color:#fff;background:#167a50;border-color:#167a50}
+[data-panel].hidden{display:none!important}
+@media(max-width:600px){.admin-tabbar{margin:0 -14px 12px;padding:10px 14px 14px}.admin-tab{padding:12px 14px}}
