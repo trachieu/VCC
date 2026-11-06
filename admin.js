@@ -136,7 +136,10 @@ function openAdminTab(name){
  document.querySelectorAll('[data-panel]').forEach(el=>el.classList.toggle('hidden',el.dataset.panel!==name));
  adminTabs.forEach(b=>{const on=b.dataset.tab===name;b.classList.toggle('selected',on);b.setAttribute('aria-selected',String(on))});
 }
-adminTabs.forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
+adminTabs.forEach(b=>{
+ b.addEventListener('click', e=>{e.preventDefault();openAdminTab(b.dataset.tab)});
+ b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAdminTab(b.dataset.tab)}});
+});
 // Lịch sử đã chốt chỉ được xóa qua RLS admin. Xóa đơn trước, sau đó xóa đợt.
 async function purgeArchive(roundIds){
  if(!roundIds.length)return notify('Chưa có lịch sử để xóa');

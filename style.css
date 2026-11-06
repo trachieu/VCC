@@ -22,3 +22,36 @@
 .admin-tab.selected{color:#fff;background:#167a50;border-color:#167a50}
 [data-panel].hidden{display:none!important}
 @media(max-width:600px){.admin-tabbar{margin:0 -14px 12px;padding:10px 14px 14px}.admin-tab{padding:12px 14px}}
+
+/* V16.12: Tab rõ ràng, dễ bấm và tách khoảng cách */
+#dashboard .admin-tabbar {
+ display:flex !important; flex-wrap:wrap !important; align-items:center !important;
+ gap:14px 16px !important; overflow:visible !important; position:relative !important;
+ padding:8px 2px 24px !important; margin:12px 0 4px !important;
+ background:transparent !important; z-index:2;
+}
+#dashboard .admin-tabbar .admin-tab {
+ display:inline-flex !important; justify-content:center; align-items:center;
+ flex:0 0 auto !important; min-height:48px !important; margin:0 !important;
+ padding:12px 20px !important; border-radius:14px !important;
+ border:1px solid #cbded2 !important; background:#fff !important; color:#20533d !important;
+ box-shadow:0 2px 8px rgba(16,61,46,.06) !important;
+ font-size:15px; font-weight:650; letter-spacing:0;
+ cursor:pointer !important; pointer-events:auto !important;
+ transition:background .15s,transform .15s,border-color .15s;
+}
+#dashboard .admin-tabbar .admin-tab:hover {background:#ecf7f0 !important; border-color:#167a50 !important; transform:translateY(-1px)}
+#dashboard .admin-tabbar .admin-tab.selected,
+#dashboard .admin-tabbar .admin-tab[aria-selected="true"] {
+ background:#167a50 !important;color:white !important;border-color:#167a50 !important;
+ box-shadow:0 3px 10px rgba(22,122,80,.2) !important;
+}
+#dashboard [data-panel] {margin-top:0;min-height:230px;padding:26px 28px;}
+#dashboard [data-panel] h2 {margin-bottom:20px;}
+#dashboard [data-panel] .row {gap:14px;}
+#dashboard #roundState {display:block;padding:16px 20px;border-radius:14px;margin-bottom:22px;}
+@media(max-width:650px){
+ #dashboard .admin-tabbar{display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:10px !important;padding:6px 0 20px !important;margin:10px 0 0 !important;}
+ #dashboard .admin-tabbar .admin-tab{white-space:normal !important;text-align:center !important;min-height:54px !important;padding:10px 8px !important;}
+ #dashboard [data-panel]{padding:18px 16px;}
+}
