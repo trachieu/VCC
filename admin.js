@@ -82,3 +82,22 @@ $('newRound').onclick=async()=>{if(current)return notify('Hãy kết thúc đợ
 function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'',Mon:formatItems(o.items),Tong_tien:o.total,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}
 $('exportOrders').onclick=()=>exportCsv(rowsFor(orders.filter(o=>o.round_id===current?.id)),'don-hien-tai.csv');$('exportArchive').onclick=()=>exportCsv(rowsFor(orders.filter(o=>history.some(r=>r.id===o.round_id))),'lich-su.csv');
 sb.channel('admin-orders').on('postgres_changes',{event:'*',schema:'public',table:'orders'},reloadAdmin).on('postgres_changes',{event:'*',schema:'public',table:'order_rounds'},reloadAdmin).subscribe();start();
+
+// Chỉ đổi mật khẩu quản trị qua Supabase Auth.
+$('changeAdminPassword').onclick=async()=>{
+ const button=$('changeAdminPassword'),status=$('passwordChangeStatus');
+ const current=$('adminCurrentPassword').value,pass=$('adminNewPassword').value,confirmPass=$('adminConfirmPassword').value;
+ if(!current)return status.textContent='Nhập mật khẩu hiện tại.';
+ if(!pass)return status.textContent='Nhập mật khẩu mới.';
+ if(pass!==confirmPass)return status.textContent='Mật khẩu nhập lại không khớp.';
+ if(current===pass)return status.textContent='Mật khẩu mới phải khác mật khẩu cũ.';
+ try{
+  if(!await checkAdmin())throw Error('Bạn cần đăng nhập quản trị.');
+  button.disabled=true;status.textContent='Đang cập nhật...';
+  // Thử xác minh mật khẩu cũ bằng tính năng current_password của Supabase Auth.
+  const {error}=await sb.auth.updateUser({password:pass,current_password:current});if(error)throw error;
+  status.textContent='Đổi mật khẩu thành công. Lần đăng nhập sau dùng mật khẩu mới.';
+ }catch(e){status.textContent=e.message+' (Độ dài tối thiểu do Supabase quy định.)'}finally{
+  $('adminCurrentPassword').value='';$('adminNewPassword').value='';$('adminConfirmPassword').value='';button.disabled=false;
+ }
+};

@@ -5,3 +5,10 @@
 
 /* Thanh toán QR theo từng đơn */
 .payment-box{text-align:center}.payment-total{font-size:30px;font-weight:800;color:#167a50;margin:8px 0}.payment-qr{display:block;width:min(100%,335px);max-height:460px;object-fit:contain;margin:12px auto;border:1px solid #dbe9df;border-radius:12px}.pay-details{text-align:left;background:#f4f8f5;padding:12px;border-radius:12px;margin:14px 0}.pay-details>div{display:flex;gap:10px;justify-content:space-between;padding:8px 0;border-bottom:1px solid #dbe9df;flex-wrap:wrap}.pay-details>div:last-child{border:0}.pay-details span{color:#668477}.link-button{background:#eaf3ed;padding:12px 16px;border-radius:10px;font-weight:700;text-decoration:none}.payment-box>.row{justify-content:center}
+
+/* V16.8 — Cài đặt mật khẩu gọn, phù hợp điện thoại */
+.account-card{max-width:680px;margin-left:auto;margin-right:auto;border:1px solid #cfe5d7;background:linear-gradient(180deg,#fcfffd 0%,#fff 100%);box-shadow:0 12px 30px rgba(12,80,51,.06)}
+.account-head{display:flex;gap:14px;align-items:center;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.account-head h2{margin:0 0 4px;font-size:23px}.account-head p{margin:0}.account-icon{width:50px;height:50px;display:grid;place-items:center;border-radius:15px;background:#e4f5e9;font-size:24px;flex-shrink:0}
+.password-form{display:grid;gap:14px;max-width:480px}.password-field{display:grid;gap:7px}.password-field label{font-weight:650;font-size:14px}.password-field input{width:100%;padding:14px 15px;border:1px solid #bfd7c7;border-radius:12px;background:#fff;transition:border-color .2s,box-shadow .2s}.password-field input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px #d7efe0}.password-save{width:100%;margin-top:6px;padding:15px 18px;border-radius:12px;font-size:15px}.password-feedback{margin:0;min-height:18px;font-size:14px;line-height:1.5;color:#206346;overflow-wrap:anywhere}
+@media(max-width:600px){.account-head h2{font-size:20px}.account-card{padding:18px}.account-head{gap:10px}.account-icon{width:44px;height:44px}}
