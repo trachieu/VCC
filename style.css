@@ -1,4 +1,10 @@
-:root{--g:#167a50;--dark:#103d2e;--p:#f4f8f5;--line:#dbe9df;--red:#bd4c4c}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Arial,sans-serif;color:var(--dark);background:var(--p);margin:0}header{background:white;border-bottom:1px solid var(--line);padding:18px max(18px,calc((100vw - 1120px)/2));display:flex;justify-content:space-between;align-items:center;gap:10px}h1{margin:0;font-size:24px}h2{font-size:20px;margin:0 0 14px}h3{margin:14px 0 8px}main{max-width:1120px;margin:22px auto;padding:0 14px 105px}.box{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.spread{justify-content:space-between}.muted{color:#668477;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:14px;padding:16px;background:white}input,select,textarea{border:1px solid #bcd3c4;border-radius:10px;padding:12px;font:inherit;background:#fff;max-width:100%;min-width:0}input[type=checkbox]{width:auto;accent-color:var(--g)}input[type=number]{width:85px}button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--g);color:white}button.secondary{background:#eaf3ed;color:var(--g)}button.danger{background:#fff0ef;color:#a12b2b}button:disabled{opacity:.45;cursor:not-allowed}.full{width:100%}.search{width:100%}.hidden{display:none!important}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.pill{background:#eaf2ed;color:#206346;border-radius:50px;padding:8px 12px}.choice{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;margin:3px;cursor:pointer}.choice:has(input:checked){border:2px solid var(--g);background:#eaf5ed}.choice input{accent-color:var(--g)}#hintList{border:1px solid var(--line);border-radius:10px;max-height:210px;overflow-y:auto;margin-top:6px}#hintList button{display:block;width:100%;text-align:left;border-radius:0;background:white;color:#203f31;font-weight:400;border-bottom:1px solid #eee}.sticky{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;z-index:10}.sticky button{min-width:230px}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:20;padding:14px}.modal .box{max-width:590px;max-height:90vh;overflow:auto;width:100%;margin:0}.item{padding:12px 0;border-bottom:1px solid var(--line)}.status{padding:10px 14px;border-radius:10px;background:#e6f2e9;margin-bottom:12px;white-space:pre-wrap}.status.err{background:#ffe8e8;color:#a12121}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:14px}th{background:#eaf4ed}a{color:var(--g)}.mini{padding:6px 10px;font-size:13px}.summary{font-size:24px;font-weight:bold;color:var(--g)}@media(max-width:600px){h1{font-size:19px}header{padding:13px 16px}.box{padding:14px}main{margin:12px auto}.sticky{justify-content:space-between}.sticky button{min-width:0;flex:1}}
+:root{--g:#167a50;--dark:#103d2e;--p:#f4f8f5;--line:#dbe9df;--red:#bd4c4c}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Arial,sans-serif;color:var(--dark);background:var(--p);margin:0}header{background:white;border-bottom:1px solid var(--line);padding:18px max(18px,calc((100vw - 1120px)/2));display:flex;justify-content:space-between;align-items:center;gap:10px}h1{margin:0;font-size:24px}
+header .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+header #hello{font-size:14px;white-space:nowrap}
+#changePerson{padding:10px 14px}
+#hintList.hidden{display:none!important}
+#hintList p{margin:0;padding:12px}
+h2{font-size:20px;margin:0 0 14px}h3{margin:14px 0 8px}main{max-width:1120px;margin:22px auto;padding:0 14px 105px}.box{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.spread{justify-content:space-between}.muted{color:#668477;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:14px;padding:16px;background:white}input,select,textarea{border:1px solid #bcd3c4;border-radius:10px;padding:12px;font:inherit;background:#fff;max-width:100%;min-width:0}input[type=checkbox]{width:auto;accent-color:var(--g)}input[type=number]{width:85px}button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--g);color:white}button.secondary{background:#eaf3ed;color:var(--g)}button.danger{background:#fff0ef;color:#a12b2b}button:disabled{opacity:.45;cursor:not-allowed}.full{width:100%}.search{width:100%}.hidden{display:none!important}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.pill{background:#eaf2ed;color:#206346;border-radius:50px;padding:8px 12px}.choice{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;margin:3px;cursor:pointer}.choice:has(input:checked){border:2px solid var(--g);background:#eaf5ed}.choice input{accent-color:var(--g)}#hintList{border:1px solid var(--line);border-radius:10px;max-height:210px;overflow-y:auto;margin-top:6px}#hintList button{display:block;width:100%;text-align:left;border-radius:0;background:white;color:#203f31;font-weight:400;border-bottom:1px solid #eee}.sticky{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;z-index:10}.sticky button{min-width:230px}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:20;padding:14px}.modal .box{max-width:590px;max-height:90vh;overflow:auto;width:100%;margin:0}.item{padding:12px 0;border-bottom:1px solid var(--line)}.status{padding:10px 14px;border-radius:10px;background:#e6f2e9;margin-bottom:12px;white-space:pre-wrap}.status.err{background:#ffe8e8;color:#a12121}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:14px}th{background:#eaf4ed}a{color:var(--g)}.mini{padding:6px 10px;font-size:13px}.summary{font-size:24px;font-weight:bold;color:var(--g)}@media(max-width:600px){h1{font-size:19px}header{padding:13px 16px;align-items:flex-start}.header-right{width:100%;justify-content:space-between}header #hello{font-size:13px}.box{padding:14px}main{margin:12px auto}.sticky{justify-content:space-between}.sticky button{min-width:0;flex:1}}
 
 /* Phân biệt rõ trạng thái của đợt */
 .state-open{background:#dcfce7;color:#166534;border:1px solid #86efac;font-weight:800}.state-locked{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;font-weight:800}.state-none{background:#f1f5f9;color:#475569}
@@ -55,3 +61,84 @@
  #dashboard .admin-tabbar .admin-tab{white-space:normal !important;text-align:center !important;min-height:54px !important;padding:10px 8px !important;}
  #dashboard [data-panel]{padding:18px 16px;}
 }
+
+
+/* V16.15 · Trang nhân viên */
+:root{--g:#167a50;--dark:#123f2b;--p:#f4f8f5;--line:#e1ece5}
+body{background:#f5f8f5;color:#173d2a}
+header{box-shadow:0 1px 10px #183b2208;padding-block:16px}
+header h1{font-weight:850;letter-spacing:-.5px}
+header #hello{font-weight:600;color:#316c4f}
+.member-app{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(270px,1fr);gap:18px;align-items:start}
+.member-app>.hero-card{grid-column:1/-1}
+.member-app>#restaurantsSection,.member-app>#menuSection,.member-app>#myOrdersSection{grid-column:1}
+.member-app>.dashboard-sidebar{grid-column:2;grid-row:2}
+.hero-card{min-height:205px;background:linear-gradient(117deg,#f7f8ed 0%,#e8f3e7 67%,#d7e8d8 100%);position:relative;overflow:hidden;border:1px solid #e2ece0;padding:32px 38px;box-shadow:0 8px 28px #28452b12}
+.hero-card:after{content:'🧋  🥪';position:absolute;right:7%;bottom:20px;font-size:77px;opacity:.76;filter:drop-shadow(0 8px 10px #173d2a22);pointer-events:none}
+.hero-card>.row,.hero-card>.tabs{position:relative;z-index:1;max-width:75%}
+.hero-card h2{font-size:clamp(23px,3vw,33px);letter-spacing:-.7px;margin-bottom:16px}
+.hero-card .round-badge{display:inline-flex;font-weight:750;background:#e2f3e8;border:1px solid #c5e5d2;padding:9px 15px}
+.hero-card .tabs{gap:12px;margin-top:17px}
+.hero-card .tabs button{padding:13px 24px;font-size:15px;border-radius:14px;border:1px solid #b7d6c4}
+.hero-card #tabRestaurants{background:#13794d;color:white;box-shadow:0 5px 14px #12644322}
+.hero-card #tabOrders{background:#fff;color:#156743}
+.hero-card #changePerson{background:white;box-shadow:0 3px 10px #174b2717}
+.orders-panel,.sidebar-card{box-shadow:0 8px 26px #28452b0a;border-color:#e0eae3}
+.orders-panel{min-height:360px;padding:25px}
+.orders-panel h2{font-size:23px}
+.orders-panel h3{background:#eef7ed;padding:13px;border-radius:12px;margin:20px 0 12px}
+.orders-panel .item{border:1px solid #e0ebdf;border-radius:15px;padding:17px;margin:12px 0;background:white}
+.orders-panel .item strong{font-weight:750}
+.orders-panel .item .pill{background:#fff3e3;color:#9b570f}
+.orders-panel .item button{border-radius:11px}
+.sidebar-card{padding:23px;margin-bottom:16px}
+.sidebar-card h2{font-size:19px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.stat-stat{padding:15px 11px;border-radius:14px;background:#eff8f1;min-height:96px}
+.stat-stat:nth-child(2){background:#fff6e9}.stat-stat:nth-child(3){background:#fff0ed}
+.stat-stat span{display:block;color:#557061;font-size:12px;margin-bottom:12px}
+.stat-stat strong{display:block;font-size:19px;overflow-wrap:anywhere}
+.sidebar-status{display:inline-block;border-radius:99px;padding:9px 14px;background:#e8f6eb;color:#146a40;font-weight:700}
+.member-app #restaurantsSection .card,.member-app #menuSection .card{box-shadow:0 3px 12px #0c3f1910;transition:transform .15s}
+.member-app #restaurantsSection .card:hover,.member-app #menuSection .card:hover{transform:translateY(-2px)}
+.sticky{width:max-content;max-width:calc(100% - 30px);left:50%;right:auto;transform:translateX(-50%);bottom:13px;border:1px solid #dceae0;border-radius:999px;box-shadow:0 7px 25px #183d2525;padding:9px 12px 9px 22px;gap:18px}
+.sticky button{border-radius:999px}
+@media(max-width:820px){.member-app{display:flex;flex-direction:column;gap:0}.member-app>*{width:100%}.hero-card{min-height:180px;padding:22px}.hero-card:after{font-size:46px;right:18px;bottom:18px;opacity:.4}.hero-card>.row,.hero-card>.tabs{max-width:100%}.hero-card h2{font-size:24px}.dashboard-sidebar{display:block;order:5}.stat-grid{gap:8px}.sticky{bottom:8px}}
+@media(max-width:510px){.hero-card .tabs{flex-wrap:nowrap}.hero-card .tabs button{padding:11px 10px;font-size:13px;flex:1}.hero-card #changePerson{font-size:12px}.orders-panel,.sidebar-card{padding:16px}.stat-stat{padding:12px 9px}.stat-stat strong{font-size:16px}.sticky{width:calc(100% - 22px);max-width:100%;justify-content:space-between}.sticky button{min-width:0}}
+
+
+/* V16.16 - Can chinh layout nhan vien */
+body{overflow-x:hidden}
+main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-right:clamp(14px,2.6vw,30px);padding-bottom:135px;margin:22px auto}
+.member-app{grid-template-columns:minmax(0,1fr) minmax(285px,360px);gap:20px;align-items:start}
+.member-app > .hero-card{grid-column:1/-1;min-width:0}
+/* Khi chon quan hay mo menu, su dung toan bo chieu ngang. */
+.member-app > #restaurantsSection,.member-app > #menuSection{grid-column:1/-1;min-width:0;width:100%}
+.member-app > #myOrdersSection{grid-column:1;min-width:0}
+.member-app > .dashboard-sidebar{grid-column:2;grid-row:2;min-width:0}
+.member-app #restaurantsSection .grid,.member-app #menuList{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr));gap:14px}
+.member-app #menuList .card,.member-app #restaurantsSection .card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.member-app #menuList .card p{margin:0;line-height:1.6}
+.member-app #menuList .card button,.member-app #restaurantsSection .card button{margin-top:auto}
+.member-app .box{min-width:0}
+#menuCategories{gap:8px}
+#menuCategories button{white-space:normal}
+.sticky{bottom:max(12px,env(safe-area-inset-bottom));z-index:12}
+@media(max-width:820px){
+ .member-app{display:flex;flex-direction:column;gap:0}
+ .member-app > .dashboard-sidebar{grid-row:auto;width:100%}
+ .member-app > #restaurantsSection,.member-app > #menuSection,.member-app > #myOrdersSection{width:100%}
+ .member-app #menuList{grid-template-columns:repeat(2,minmax(0,1fr))}
+ main{padding-bottom:125px}
+}
+@media(max-width:540px){
+ .member-app #menuList,.member-app #restaurantsSection .grid{grid-template-columns:1fr}
+ .hero-card:after{font-size:35px;opacity:.16}
+ .hero-card>.row,.hero-card>.tabs{max-width:100%}
+ .hero-card{padding:20px 16px}
+ .hero-card h2{font-size:clamp(21px,6vw,25px)}
+ .sticky{width:calc(100% - 20px);max-width:100%;gap:10px}
+}
+
+/* 16.18: dropdown chi hien khi tim */
+#hintList.hidden{display:none!important}
