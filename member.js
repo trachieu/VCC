@@ -76,13 +76,13 @@ function renderOrders(){
  const previous=mine.filter(o=>o.round_id!==round?.id);
  function orderHtml(o,isCurrent){
   const canCancel=isCurrent&&round?.status==='open'&&!o.paid;
-  return `<div class="item"><div class="row spread"><strong>${ts(o.created_at)} · ${money(o.total)}</strong><span class="pill">${o.paid?'✅ Đã thanh toán':'Chưa thanh toán'}</span></div><p>${safe(formatItems(o.items))}</p><div class="row">${isCurrent&&!o.paid?`<button class="mini" data-pay="${o.id}">💳 Thanh toán</button>`:''}${canCancel?`<button class="danger mini" data-cancel="${o.id}">Hủy đơn</button>`:''}</div></div>`;
+  return `<div class="item"><div class="row spread"><strong>${ts(o.created_at)} · ${money(o.total)}</strong><span class="pill">${o.paid?'✅ Đã thanh toán':'Chưa thanh toán'}</span></div><p>${safe(formatItems(o.items))}</p><div class="row">${!o.paid?`<button class="mini" data-pay="${o.id}">💳 Thanh toán</button>`:''}${canCancel?`<button class="danger mini" data-cancel="${o.id}">Hủy đơn</button>`:''}</div></div>`;
  }
- updateMemberStats(current);
+ updateMemberStats(mine,current);
  $('ordersList').innerHTML='<h3>Đợt hiện tại</h3>'+(current.map(o=>orderHtml(o,true)).join('')||'<p>Chưa có đơn.</p>')+
    '<h3 style="margin-top:22px">Lịch sử các đợt trước</h3>'+(previous.map(o=>orderHtml(o,false)).join('')||'<p>Chưa có lịch sử.</p>');
  document.querySelectorAll('#ordersList button[data-pay]').forEach(b=>b.onclick=()=>{
-  const o=myOrders.find(x=>x.id===b.dataset.pay&&x.member_id===person?.id&&x.round_id===round?.id);
+  const o=myOrders.find(x=>x.id===b.dataset.pay&&x.member_id===person?.id);
   if(o)showPayment(o);
  });
  document.querySelectorAll('#ordersList button[data-cancel]').forEach(b=>b.onclick=async()=>{
@@ -103,10 +103,11 @@ function renderOrders(){
 $('tabRestaurants').onclick=()=>showSection('restaurantsSection');$('tabOrders').onclick=async()=>{await loadOrders();showSection('myOrdersSection')};$('backRestaurants').onclick=()=>showSection('restaurantsSection');
 sb.channel('member-rounds').on('postgres_changes',{event:'*',schema:'public',table:'order_rounds'},async()=>{await reload();}).subscribe();init();
 
-function updateMemberStats(current){
-  const items=current.flatMap(o=>Array.isArray(o.items)?o.items:[]);
+function updateMemberStats(mine,current){
+  // Hiển thị thống kê tất cả đợt: đóng đợt không đồng nghĩa đã thanh toán.
+  const items=mine.flatMap(o=>Array.isArray(o.items)?o.items:[]);
   $('statQty').textContent=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
-  $('statTotal').textContent=money(current.reduce((s,o)=>s+(Number(o.total)||0),0));
-  $('statUnpaid').textContent=money(current.filter(o=>!o.paid).reduce((s,o)=>s+(Number(o.total)||0),0));
+  $('statTotal').textContent=money(mine.reduce((s,o)=>s+(Number(o.total)||0),0));
+  $('statUnpaid').textContent=money(mine.filter(o=>!o.paid).reduce((s,o)=>s+(Number(o.total)||0),0));
   $('sidebarRoundStatus').textContent=round?(round.status==='open'?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt';
 }
