@@ -154,21 +154,35 @@ async function loadOrders(){
  myOrders=(data||[]).filter(o=>o.member_id===selectedId);
  renderOrders();
 }
-// VietQR Quick Link: số tiền lấy từ bản ghi do Supabase tính, mỗi đơn có mã tham chiếu riêng.
-const PAY_BANK='970432',PAY_ACCOUNT='316666663',PAY_NAME='CU THANH TUNG';
+// Đọc thông tin nhận tiền mới nhất ở mỗi lần mở thanh toán.
 function paymentNote(o){const owner=members.find(m=>m.id===o.member_id);return ((owner?.name || person?.name || 'Nhan vien').trim()+' chuyen khoan').slice(0,100)}
-function showPayment(o){
+async function showPayment(o){
  if(o.paid)return notify('Đơn này đã được xác nhận thanh toán');
  const amount=Number(o.total);
  if(!Number.isInteger(amount)||amount<=0)return notify('Số tiền đơn không hợp lệ',true);
  const note=paymentNote(o);
- const url=`https://img.vietqr.io/image/${PAY_BANK}-${PAY_ACCOUNT}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(PAY_NAME)}`;
+ $('payModal').classList.remove('hidden');
  $('payAmount').textContent=money(amount);
  $('payNote').textContent=note;
- $('payQr').src=url;
- $('payQrLink').href=url;
- $('qrIssue').textContent='';
- $('payModal').classList.remove('hidden');
+ $('payBank').textContent='';$('payOwner').textContent='';$('payAccount').textContent='';
+ $('payQr').removeAttribute('src');$('payQrLink').removeAttribute('href');
+ $('qrIssue').textContent='Đang tải thông tin chuyển khoản…';
+ try{
+  const {data,error}=await sb.from('payment_settings').select('bank_bin,bank_name,account_number,account_name').eq('id',1).single();
+  if(error)throw error;
+  if($('payModal').classList.contains('hidden'))return;
+  if(!/^\d{6}$/.test(data.bank_bin)||!/^\d{4,25}$/.test(data.account_number)||!data.account_name)throw Error('Thông tin ngân hàng chưa hợp lệ');
+  const url=`https://img.vietqr.io/image/${data.bank_bin}-${data.account_number}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(data.account_name)}`;
+  $('payBank').textContent=data.bank_name;
+  $('payOwner').textContent=data.account_name;
+  $('payAccount').textContent=data.account_number;
+  $('qrIssue').textContent='';
+  $('payQrLink').href=url;
+  $('payQr').src=url;
+ }catch(e){
+  $('qrIssue').textContent='Không tải được thông tin chuyển khoản. Vui lòng báo quản trị kiểm tra cài đặt QR.';
+  $('payQrLink').removeAttribute('href');
+ }
 }
 $('payQr').onerror=()=>{$('qrIssue').textContent='Không tải được ảnh QR. Bạn có thể dùng thông tin chuyển khoản bên dưới.'};
 $('closePay').onclick=()=>$('payModal').classList.add('hidden');

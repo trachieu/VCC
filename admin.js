@@ -50,8 +50,26 @@ function renderPaymentOrders(live){
  $('paymentOrderRows').innerHTML=list.map(orderRow).join('')||`<tr><td colspan="5" class="empty-pay">${isPaid?'Chưa có đơn đã thanh toán':'Không còn đơn chưa thanh toán'}</td></tr>`;
  document.querySelectorAll('[data-pay]').forEach(e=>e.onchange=async()=>{e.disabled=true;let{error}=await sb.from('orders').update({paid:e.checked}).eq('id',e.dataset.pay);if(error)notify(error.message,true);await reloadAdmin()});
 }
+// Công nợ của tất cả đợt, tính theo từng đơn chưa thanh toán (không cộng trùng).
+function debtRows(){
+ const grouped=new Map();
+ for(const o of orders){
+  const key=o.member_id||'deleted';
+  if(!grouped.has(key))grouped.set(key,{member_id:key,name:members.find(m=>m.id===key)?.name||'Nhân viên đã xóa',unpaid:0,paid:0,unpaidCount:0,paidCount:0});
+  const row=grouped.get(key),amount=Number(o.total)||0;
+  if(o.paid){row.paid+=amount;row.paidCount++}else{row.unpaid+=amount;row.unpaidCount++}
+ }
+ return [...grouped.values()].sort((a,b)=>b.unpaid-a.unpaid||a.name.localeCompare(b.name,'vi'));
+}
+function renderDebts(){
+ const owing=debtRows().filter(x=>x.unpaid>0),total=owing.reduce((sum,x)=>sum+x.unpaid,0);
+ $('debtTotal').textContent=money(total);
+ $('debtPeople').textContent=owing.length+' người còn nợ';
+ $('debtRows').innerHTML=owing.map(x=>`<tr><td>${safe(x.name)}</td><td>${x.unpaidCount}</td><td><strong>${money(x.unpaid)}</strong></td></tr>`).join('')||'<tr><td colspan="3" class="empty-pay">Không có nhân viên còn nợ</td></tr>';
+}
 function renderAdmin(){$('roundState').textContent=current?`${current.name} · ${current.status==='open'?'Đang mở':'Đã khóa'}`:'Chưa có đợt hiện tại';$('toggleLock').disabled=!current; $('toggleLock').textContent=!current?'Chưa có đợt':current.status==='open'?'🔒 Khóa đơn':'🔓 Mở khóa';$('toggleLock').className=current?.status==='open'?'danger':'secondary';$('roundState').className='pill '+(current?.status==='open'?'state-open':current?.status==='locked'?'state-locked':'state-none');$('archiveRound').disabled=!current;let live=orders.filter(x=>x.round_id===current?.id),people=new Set(live.map(x=>x.member_id));let paid=live.filter(x=>x.paid).reduce((a,x)=>a+x.total,0),total=live.reduce((a,x)=>a+x.total,0);$('stats').innerHTML=[['Người đặt',people.size],['Số đơn',live.length],['Số món',live.reduce((a,x)=>a+(x.items||[]).reduce((b,y)=>b+y.qty,0),0)],['Tổng tiền',money(total)],['Đã thu',money(paid)],['Chưa thu',money(total-paid)]].map(([a,b])=>`<div class="card"><div class="muted">${a}</div><div class="summary">${b}</div></div>`).join('');
 renderPaymentOrders(live);
+renderDebts();
 $('memberList').innerHTML=members.filter(x=>x.active).sort((a,b)=>a.name.localeCompare(b.name,'vi')).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-member="${x.id}">Sửa</button> <button class="danger mini" data-remove-member="${x.id}">Xóa</button></span></div>`).join('');
 $('restaurantList').innerHTML=restaurants.filter(x=>x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-rest="${x.id}">Sửa</button> <button class="danger mini" data-remove-rest="${x.id}">Xóa</button></span></div>`).join('');
 $('menuRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderAdminMenu();$('toppingRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderToppings();
@@ -147,8 +165,17 @@ $('addTopping').onclick=()=>{const name=$('toppingName').value.trim(),price=$('t
 $('newRound').onclick=async()=>{if(current)return notify('Hãy kết thúc đợt hiện tại trước',true);let name=$('roundName').value.trim();if(name)await add('order_rounds',{name,status:'open'},['roundName'])};$('toggleLock').onclick=()=>current&&change('order_rounds',current.id,{status:current.status==='open'?'locked':'open'});$('archiveRound').onclick=()=>current&&change('order_rounds',current.id,{status:'archived'},'Kết thúc đợt này? Lịch sử sẽ không sửa được.');$('refreshOrders').onclick=reloadAdmin;
 document.querySelectorAll('[data-payment-filter]').forEach(b=>b.onclick=()=>{paymentFilter=b.dataset.paymentFilter;const live=orders.filter(x=>x.round_id===current?.id);renderPaymentOrders(live)});
 
-function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'',Mon:formatItems(o.items),Tong_tien:o.total,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}
-$('exportOrders').onclick=()=>exportCsv(rowsFor(orders.filter(o=>o.round_id===current?.id)),'don-hien-tai.csv');$('exportArchive').onclick=()=>exportCsv(rowsFor(orders.filter(o=>history.some(r=>r.id===o.round_id))),'lich-su.csv');
+function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'Đã xóa',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'Quán',Mon:formatItems(o.items),Tong_tien:Number(o.total)||0,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}
+function excelSheet(name,items,headers){return {name,rows:[headers,...items.map(r=>headers.map(h=>r[h]??''))]}}
+function orderSheet(name,arr){return excelSheet(name,rowsFor(arr),['Nguoi_dat','Quan','Mon','Tong_tien','Thanh_toan','Ngay_dat','Dot'])}
+$('exportOrders').onclick=()=>exportExcel([orderSheet('Đơn hiện tại',orders.filter(o=>o.round_id===current?.id))],'don-hien-tai.xlsx');
+$('exportArchive').onclick=()=>exportExcel([orderSheet('Lịch sử',orders.filter(o=>history.some(r=>r.id===o.round_id)))],'lich-su.xlsx');
+$('exportDebts').onclick=()=>{
+ const owing=debtRows().filter(x=>x.unpaid>0);
+ const summary=owing.map(x=>({Nhan_vien:x.name,So_don_chua_thu:x.unpaidCount,Con_no:x.unpaid}));
+ const debtDetail=orders.filter(o=>!o.paid).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+ exportExcel([excelSheet('Tổng hợp công nợ',summary,['Nhan_vien','So_don_chua_thu','Con_no']),orderSheet('Chi tiết chưa thu',debtDetail)],'cong-no-nhan-vien.xlsx');
+};
 sb.channel('admin-orders').on('postgres_changes',{event:'*',schema:'public',table:'orders'},reloadAdmin).on('postgres_changes',{event:'*',schema:'public',table:'order_rounds'},reloadAdmin).subscribe();start();
 
 // Chỉ đổi mật khẩu quản trị qua Supabase Auth.
@@ -170,6 +197,33 @@ $('changeAdminPassword').onclick=async()=>{
  }
 };
 
+
+// Thông tin QR lưu tập trung tại Supabase, chỉ Admin có quyền sửa.
+async function loadQrSettings(){
+ const status=$('qrSettingsStatus');
+ try{
+  const {data,error}=await sb.from('payment_settings').select('bank_bin,bank_name,account_number,account_name').eq('id',1).single();
+  if(error)throw error;
+  $('qrBank').value=data.bank_bin;
+  $('qrAccount').value=data.account_number;
+  $('qrOwner').value=data.account_name;
+  status.textContent='';
+ }catch(e){status.textContent='Không tải được thông tin QR. Kiểm tra đã chạy SQL cài đặt.';}
+}
+$('saveQrSettings').onclick=async()=>{
+ const b=$('qrBank'),account=$('qrAccount').value.trim(),owner=$('qrOwner').value.trim();
+ const bank=b.options[b.selectedIndex]?.text||'';
+ const status=$('qrSettingsStatus');
+ if(!b.value||!/^\d{4,25}$/.test(account)||!owner||owner.length>100){status.textContent='Hãy chọn ngân hàng, nhập số tài khoản (4–25 chữ số) và tên chủ tài khoản.';return;}
+ const btn=$('saveQrSettings');btn.disabled=true;status.textContent='Đang lưu…';
+ try{
+  const {data,error}=await sb.from('payment_settings').update({bank_bin:b.value,bank_name:bank,account_number:account,account_name:owner}).eq('id',1).select('id').single();
+  if(error)throw error;
+  if(!data)throw Error('Không có quyền cập nhật thông tin QR');
+  status.textContent='Đã lưu thông tin chuyển khoản.';
+ }catch(e){status.textContent='Không lưu được: '+e.message;}finally{btn.disabled=false;}
+};
+
 // V16.10: Tabs quản trị. Không hiển thị các mục khác trong cùng lúc.
 const adminTabs=[...document.querySelectorAll('.admin-tab')];
 function openAdminTab(name){
@@ -177,7 +231,7 @@ function openAdminTab(name){
  adminTabs.forEach(b=>{const on=b.dataset.tab===name;b.classList.toggle('selected',on);b.setAttribute('aria-selected',String(on))});
 }
 adminTabs.forEach(b=>{
- b.addEventListener('click', e=>{e.preventDefault();openAdminTab(b.dataset.tab)});
+ b.addEventListener('click', e=>{e.preventDefault();openAdminTab(b.dataset.tab);if(b.dataset.tab==='qr')loadQrSettings()});
  b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAdminTab(b.dataset.tab)}});
 });
 // Lịch sử đã chốt chỉ được xóa qua RLS admin. Xóa đơn trước, sau đó xóa đợt.

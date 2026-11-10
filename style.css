@@ -198,3 +198,17 @@ main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-rig
 .archive-order-paid{opacity:.78;background:#f5f8f6;border-left-color:#d5dfd8}
 .archive-empty{padding:8px 20px}
 @media(max-width:700px){.archive-round-head{padding-right:72px;gap:8px}.archive-round-actions{right:8px;top:12px}}
+
+/* V16.35 - Tổng hợp công nợ, dùng trong tab Lịch sử */
+.debt-summary{margin:20px 0 24px;padding:18px;border:1px solid var(--line);border-radius:16px;background:#f8fcf9}
+.debt-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.debt-heading h3{margin:0 0 4px}
+.debt-heading p{margin:0}
+.debt-stats{display:flex;align-items:baseline;gap:12px;margin:16px 0;color:#17643f;flex-wrap:wrap}
+.debt-stats strong{font-size:27px}
+.debt-table{width:100%;min-width:570px}
+.debt-table th,.debt-table td{text-align:left}
+@media(max-width:600px){.debt-summary{padding:12px}.debt-heading button{width:100%}}
+
+/* V16.39: cài đặt QR của quản trị */
+.qr-settings{max-width:500px;display:grid;gap:10px}.qr-settings label{font-weight:700}.qr-settings input,.qr-settings select{width:100%;max-width:100%}.qr-settings button{justify-self:start;margin-top:8px}.qr-settings #qrSettingsStatus{min-height:1.3em}@media(max-width:600px){.qr-settings button{width:100%}}
