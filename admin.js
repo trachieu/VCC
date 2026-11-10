@@ -258,6 +258,68 @@ function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.mem
 function excelSheet(name,items,headers){return {name,rows:[headers,...items.map(r=>headers.map(h=>r[h]??''))]}}
 function orderSheet(name,arr){return excelSheet(name,rowsFor(arr),['Nguoi_dat','Quan','Mon','Tong_tien','Thanh_toan','Ngay_dat','Dot'])}
 $('exportOrders').onclick=()=>exportExcel([orderSheet('Đơn hiện tại',orders.filter(o=>o.round_id===current?.id))],'don-hien-tai.xlsx');
+
+// Sao chép danh sách đặt hàng của đợt hiện tại để gửi riêng cho từng quán.
+function buildRestaurantOrderText(roundOrders){
+ const byRestaurant=new Map();
+ for(const order of roundOrders){
+  const restaurantName=restaurants.find(r=>r.id===order.restaurant_id)?.name||'Quán không xác định';
+  const memberName=members.find(m=>m.id===order.member_id)?.name||'Nhân viên đã xóa';
+  if(!byRestaurant.has(order.restaurant_id))byRestaurant.set(order.restaurant_id,{name:restaurantName,lines:new Map()});
+  const bucket=byRestaurant.get(order.restaurant_id);
+  for(const item of (Array.isArray(order.items)?order.items:[])){
+   const qty=Number(item.qty);
+   if(!Number.isInteger(qty)||qty<=0)continue;
+   const toppings=Array.isArray(item.toppings)?item.toppings.map(String).sort((a,b)=>a.localeCompare(b,'vi')):[];
+   const note=String(item.note||'').trim();
+   const size=String(item.size||'M');
+   const sugar=item.sugar??100, ice=item.ice??100;
+   // Không gộp món khác cấu hình, ghi chú hoặc đơn giá.
+   const unit=Number(item.unit)||0;
+   const key=JSON.stringify([item.menu_id||item.name,item.name,size,sugar,ice,toppings,note,unit]);
+   if(!bucket.lines.has(key))bucket.lines.set(key,{name:item.name||'Món',size,sugar,ice,toppings,note,unit,qty:0,people:new Map()});
+   const groupedLine=bucket.lines.get(key);
+   groupedLine.qty+=qty;
+   groupedLine.people.set(memberName,(groupedLine.people.get(memberName)||0)+qty);
+  }
+ }
+ const sections=[];
+ for(const {name,lines} of byRestaurant.values()){
+  const list=[...lines.values()];
+  if(!list.length)continue;
+  const sum=list.reduce((n,x)=>n+x.unit*x.qty,0);
+  const linesText=list.map((x,i)=>{
+   const people=[...x.people.keys()].join(', ');
+   let line=`${i+1}. ${people} — ${x.name} (${x.size}) × ${x.qty} — đường ${x.sugar}%, đá ${x.ice}%`;
+   if(x.toppings.length)line+=`\n   Topping: ${x.toppings.join(', ')}`;
+   if(x.note)line+=`\n   Ghi chú: ${x.note}`;
+   return line;
+  });
+  sections.push(`QUÁN: ${name}\n${linesText.join('\n')}\nTổng: ${money(sum)}`);
+ }
+ return sections.length?`ĐƠN ĐẶT HÀNG — ${current?.name||'Đợt hiện tại'}\n\n${sections.join('\n\n')}`:'';
+}
+async function copyTextToClipboard(value){
+ if(navigator.clipboard?.writeText){
+  try{await navigator.clipboard.writeText(value);return;}catch(_){/* Dùng phương án dự phòng */}
+ }
+ const input=document.createElement('textarea');input.value=value;input.style.position='fixed';input.style.left='-9999px';
+ document.body.appendChild(input);input.focus();input.select();
+ const ok=document.execCommand('copy');input.remove();
+ if(!ok)throw new Error('Không sao chép được. Hãy dùng HTTPS hoặc cho phép trình duyệt truy cập bộ nhớ tạm.');
+}
+$('copyOrders').onclick=async()=>{
+ if(!current)return notify('Chưa có đợt hiện tại.',true);
+ const live=orders.filter(o=>o.round_id===current.id);
+ if(!live.length)return notify('Đợt hiện tại chưa có đơn để sao chép.');
+ const content=buildRestaurantOrderText(live);
+ if(!content)return notify('Không có món hợp lệ để sao chép.',true);
+ const button=$('copyOrders');button.disabled=true;
+ try{await copyTextToClipboard(content);notify('Đã sao chép');button.textContent='Đã sao chép';setTimeout(()=>{button.textContent='Sao chép đơn'},1800);}
+ catch(e){notify(e.message,true)}
+ finally{button.disabled=false}
+};
+
 $('exportArchive').onclick=()=>exportExcel([orderSheet('Lịch sử',orders.filter(o=>history.some(r=>r.id===o.round_id)))],'lich-su.xlsx');
 $('exportDebts').onclick=()=>{
  const owing=debtRows().filter(x=>x.unpaid>0);
