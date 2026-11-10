@@ -290,7 +290,7 @@ function buildRestaurantOrderText(roundOrders){
   const sum=list.reduce((n,x)=>n+x.unit*x.qty,0);
   const linesText=list.map((x,i)=>{
    const people=[...x.people.keys()].join(', ');
-   let line=`${i+1}. ${people} — ${x.name} (${x.size}) × ${x.qty} — đường ${x.sugar}%, đá ${x.ice}%`;
+   let line=`${i+1}. ${people}\n   ${x.name} (${x.size}) × ${x.qty} — đường ${x.sugar}%, đá ${x.ice}%`;
    if(x.toppings.length)line+=`\n   Topping: ${x.toppings.join(', ')}`;
    if(x.note)line+=`\n   Ghi chú: ${x.note}`;
    return line;
