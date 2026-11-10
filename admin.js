@@ -1,4 +1,5 @@
 let members=[],restaurants=[],menu=[],toppingOptions=[],rounds=[],orders=[],current=null,history=[];const onlyAdmin='Bạn không có quyền quản trị.';
+let paymentFilter='unpaid';
 async function checkAdmin(){let {data:{user}}=await sb.auth.getUser();if(!user||user.is_anonymous)return false;let {data,error}=await sb.from('profiles').select('role,active').eq('id',user.id).single();return !error&&data?.role==='admin'&&data.active}
 async function start(){try{if(await checkAdmin()){showDashboard()}else{await sb.auth.signOut();$('login').classList.remove('hidden')}}catch(e){notify(e.message,true)}}
 async function showDashboard(){$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');$('logout').classList.remove('hidden');await reloadAdmin()}
@@ -33,8 +34,24 @@ $('signIn').onclick=async()=>{
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('signIn').click()});
 $('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
 async function reloadAdmin(){try{[members,restaurants,menu,toppingOptions,rounds,orders]=await Promise.all(['members','restaurants','menu_items','toppings','order_rounds','orders'].map(query));rounds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));current=rounds.find(x=>x.status!=='archived')||null;history=rounds.filter(x=>x.status==='archived');renderAdmin()}catch(e){notify(e.message,true)}}
+function renderPaymentOrders(live){
+ const sortedLive=[...live].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+ const paidLive=sortedLive.filter(x=>x.paid),unpaidLive=sortedLive.filter(x=>!x.paid);
+ $('paidCount').textContent=`${paidLive.length} đơn`;
+ $('unpaidCount').textContent=`${unpaidLive.length} đơn`;
+ const isPaid=paymentFilter==='paid',list=isPaid?paidLive:unpaidLive;
+ $('paidFilterBtn').classList.toggle('selected',isPaid);
+ $('unpaidFilterBtn').classList.toggle('selected',!isPaid);
+ $('paidFilterBtn').setAttribute('aria-selected',String(isPaid));
+ $('unpaidFilterBtn').setAttribute('aria-selected',String(!isPaid));
+ $('paymentListTitle').textContent=isPaid?'1. Đã thanh toán':'2. Chưa thanh toán';
+ $('paymentListHint').textContent=isPaid?'Danh sách người đã thanh toán':'Danh sách người chưa thanh toán';
+ const orderRow=x=>`<tr><td>${safe(members.find(m=>m.id===x.member_id)?.name||'Đã xóa')}</td><td>${safe(restaurants.find(r=>r.id===x.restaurant_id)?.name||'Quán')}<div class="muted">${safe(formatItems(x.items))}</div></td><td>${money(x.total)}</td><td><label class="pay-check"><input type="checkbox" data-pay="${x.id}" ${x.paid?'checked':''}> ${x.paid?'Đã thanh toán':'Chưa thanh toán'}</label></td><td>${ts(x.created_at)}</td></tr>`;
+ $('paymentOrderRows').innerHTML=list.map(orderRow).join('')||`<tr><td colspan="5" class="empty-pay">${isPaid?'Chưa có đơn đã thanh toán':'Không còn đơn chưa thanh toán'}</td></tr>`;
+ document.querySelectorAll('[data-pay]').forEach(e=>e.onchange=async()=>{e.disabled=true;let{error}=await sb.from('orders').update({paid:e.checked}).eq('id',e.dataset.pay);if(error)notify(error.message,true);await reloadAdmin()});
+}
 function renderAdmin(){$('roundState').textContent=current?`${current.name} · ${current.status==='open'?'Đang mở':'Đã khóa'}`:'Chưa có đợt hiện tại';$('toggleLock').disabled=!current; $('toggleLock').textContent=!current?'Chưa có đợt':current.status==='open'?'🔒 Khóa đơn':'🔓 Mở khóa';$('toggleLock').className=current?.status==='open'?'danger':'secondary';$('roundState').className='pill '+(current?.status==='open'?'state-open':current?.status==='locked'?'state-locked':'state-none');$('archiveRound').disabled=!current;let live=orders.filter(x=>x.round_id===current?.id),people=new Set(live.map(x=>x.member_id));let paid=live.filter(x=>x.paid).reduce((a,x)=>a+x.total,0),total=live.reduce((a,x)=>a+x.total,0);$('stats').innerHTML=[['Người đặt',people.size],['Số đơn',live.length],['Số món',live.reduce((a,x)=>a+(x.items||[]).reduce((b,y)=>b+y.qty,0),0)],['Tổng tiền',money(total)],['Đã thu',money(paid)],['Chưa thu',money(total-paid)]].map(([a,b])=>`<div class="card"><div class="muted">${a}</div><div class="summary">${b}</div></div>`).join('');
-$('orderRows').innerHTML=live.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(x=>`<tr><td>${safe(members.find(m=>m.id===x.member_id)?.name||'Đã xóa')}</td><td>${safe(restaurants.find(r=>r.id===x.restaurant_id)?.name||'Quán')}<div class="muted">${safe(formatItems(x.items))}</div></td><td>${money(x.total)}</td><td><label><input type="checkbox" data-pay="${x.id}" ${x.paid?'checked':''}> Đã thanh toán</label></td><td>${ts(x.created_at)}</td></tr>`).join('')||'<tr><td colspan="5">Chưa có đơn</td></tr>';document.querySelectorAll('[data-pay]').forEach(e=>e.onchange=async()=>{let{error}=await sb.from('orders').update({paid:e.checked}).eq('id',e.dataset.pay);if(error)notify(error.message,true);await reloadAdmin()});
+renderPaymentOrders(live);
 $('memberList').innerHTML=members.filter(x=>x.active).sort((a,b)=>a.name.localeCompare(b.name,'vi')).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-member="${x.id}">Sửa</button> <button class="danger mini" data-remove-member="${x.id}">Xóa</button></span></div>`).join('');
 $('restaurantList').innerHTML=restaurants.filter(x=>x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-rest="${x.id}">Sửa</button> <button class="danger mini" data-remove-rest="${x.id}">Xóa</button></span></div>`).join('');
 $('menuRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderAdminMenu();$('toppingRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderToppings();
@@ -107,6 +124,8 @@ $('toppingRestaurant').onchange=renderToppings;
 $('addTopping').onclick=()=>{const name=$('toppingName').value.trim(),price=$('toppingPrice').value,restaurant_id=$('toppingRestaurant').value;if(!restaurant_id||!name||price===''||!Number.isSafeInteger(Number(price))||Number(price)<0)return notify('Nhập tên và giá topping hợp lệ',true);add('toppings',{name,price:Number(price),restaurant_id},['toppingName','toppingPrice'])};
 
 $('newRound').onclick=async()=>{if(current)return notify('Hãy kết thúc đợt hiện tại trước',true);let name=$('roundName').value.trim();if(name)await add('order_rounds',{name,status:'open'},['roundName'])};$('toggleLock').onclick=()=>current&&change('order_rounds',current.id,{status:current.status==='open'?'locked':'open'});$('archiveRound').onclick=()=>current&&change('order_rounds',current.id,{status:'archived'},'Kết thúc đợt này? Lịch sử sẽ không sửa được.');$('refreshOrders').onclick=reloadAdmin;
+document.querySelectorAll('[data-payment-filter]').forEach(b=>b.onclick=()=>{paymentFilter=b.dataset.paymentFilter;const live=orders.filter(x=>x.round_id===current?.id);renderPaymentOrders(live)});
+
 function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'',Mon:formatItems(o.items),Tong_tien:o.total,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}
 $('exportOrders').onclick=()=>exportCsv(rowsFor(orders.filter(o=>o.round_id===current?.id)),'don-hien-tai.csv');$('exportArchive').onclick=()=>exportCsv(rowsFor(orders.filter(o=>history.some(r=>r.id===o.round_id))),'lich-su.csv');
 sb.channel('admin-orders').on('postgres_changes',{event:'*',schema:'public',table:'orders'},reloadAdmin).on('postgres_changes',{event:'*',schema:'public',table:'order_rounds'},reloadAdmin).subscribe();start();
