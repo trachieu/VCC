@@ -182,3 +182,19 @@ main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-rig
 /* V16.24 - sua don da dat */
 #ordersList .row{flex-wrap:wrap}
 #ordersList .secondary.mini{border:1px solid #c7dfd0}
+
+/* V16.34: Lịch sử theo đợt thu gọn và ưu tiên đơn chưa thanh toán */
+.archive-round{position:relative}
+.archive-round details{min-width:0}
+.archive-round-head{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding-right:85px;user-select:none}
+.archive-round-head::-webkit-details-marker{display:none}
+.archive-round-head::marker{content:""}
+.archive-round-head:focus-visible{outline:3px solid #198754;outline-offset:-3px}
+.archive-chevron{display:inline-block;font-size:22px;line-height:1;transition:transform .15s ease;flex-shrink:0}
+.archive-round details[open] .archive-chevron{transform:rotate(90deg)}
+.archive-round-summary{display:block;min-width:0}
+.archive-round-sub{display:block}
+.archive-round-actions{position:absolute;right:16px;top:14px;z-index:1}
+.archive-order-paid{opacity:.78;background:#f5f8f6;border-left-color:#d5dfd8}
+.archive-empty{padding:8px 20px}
+@media(max-width:700px){.archive-round-head{padding-right:72px;gap:8px}.archive-round-actions{right:8px;top:12px}}

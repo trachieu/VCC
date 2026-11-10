@@ -179,8 +179,8 @@ function renderOrders(){
  const current=mine.filter(o=>o.round_id===round?.id);
  const previous=mine.filter(o=>o.round_id!==round?.id);
  function orderHtml(o,isCurrent){
-  // Chỉ máy chủ quyết định quyền sửa: không dựa vào order_rounds có thể bị RLS ẩn.
-  const canEdit=!o.paid;
+  // Chỉ sửa đơn chưa thanh toán thuộc đợt hiện tại khi Admin đang mở đơn.
+  const canEdit=!o.paid&&isCurrent&&round?.status==='open';
   const canCancel=!o.paid&&isCurrent&&round?.status==='open';
   return `<div class="item"><div class="row spread"><strong>${ts(o.created_at)} · ${money(o.total)}</strong><span class="pill">${o.paid?'✅ Đã thanh toán':'Chưa thanh toán'}</span></div><p>${safe(formatItems(o.items))}</p><div class="row">${!o.paid?`<button class="mini" data-pay="${o.id}">💳 Thanh toán</button>`:''}${canEdit?`<button class="secondary mini" data-edit-order="${o.id}">✏️ Sửa đơn</button>`:''}${canCancel?`<button class="danger mini" data-cancel="${o.id}">Hủy đơn</button>`:''}</div></div>`;
  }
@@ -194,6 +194,7 @@ function renderOrders(){
  document.querySelectorAll('#ordersList button[data-edit-order]').forEach(b=>b.onclick=()=>{
   const o=myOrders.find(x=>x.id===b.dataset.editOrder&&x.member_id===person?.id&&!x.paid);
   if(!o)return notify('Không tìm thấy đơn chưa thanh toán.',true);
+  if(o.round_id!==round?.id||round?.status!=='open')return notify('Đợt đã khóa, không thể sửa đơn.',true);
   if(cart.length&&!confirm('Giỏ hàng hiện tại sẽ được thay bằng các món của đơn này. Tiếp tục?'))return;
   const rest=restaurants.find(r=>r.id===o.restaurant_id);
   if(!rest)return notify('Quán của đơn này không còn hoạt động.',true);
