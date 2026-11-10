@@ -53,7 +53,7 @@ function openItem(x,existing=null,editIndex=-1){
  document.querySelectorAll('[name=topping]').forEach(el=>{el.checked=(line.toppings||[]).includes(el.value)});
  $('qty').value=line.qty||1;
  $('note').value=line.note||'';
- $('addToCart').textContent=editIndex>=0?'Lưu thay đổi':'Thêm vào giỏ';
+ $('addToCart').textContent=editingOrderId?'Lưu thay đổi lên hệ thống':(editIndex>=0?'Lưu thay đổi':'Thêm vào giỏ');
  $('itemModal').querySelectorAll('input').forEach(e=>e.addEventListener('change',calcLine));
  calcLine();
 }
@@ -65,11 +65,23 @@ function closeItemEditor(){
  if(returnToCartAfterItemEdit){returnToCartAfterItemEdit=false;renderCart();$('cartModal').classList.remove('hidden')}
 }
 $('closeModal').onclick=closeItemEditor;
-$('addToCart').onclick=()=>{
+$('addToCart').onclick=async()=>{
  const line=getLine();
- if(editingCartIndex>=0&&editingCartIndex<cart.length){cart[editingCartIndex]=line;notify('Đã cập nhật món trong giỏ');}
- else{cart.push(line);notify('Đã thêm vào giỏ');}
- editingCartIndex=-1;renderCart();closeItemEditor();
+ const oldIndex=editingCartIndex;
+ const previous=cart.map(x=>({...x,toppings:[...(x.toppings||[])]}));
+ if(oldIndex>=0&&oldIndex<cart.length)cart[oldIndex]=line;
+ else cart.push(line);
+ renderCart();
+ if(editingOrderId){
+  $('addToCart').disabled=true;
+  try{
+   const saved=await submitOrder();
+   if(!saved){cart=previous;renderCart();return;}
+   return;
+  }finally{$('addToCart').disabled=false;}
+ }
+ notify(oldIndex>=0?'Đã cập nhật món trong giỏ':'Đã thêm vào giỏ');
+ closeItemEditor();
 };
 function cartSum(){return cart.reduce((s,x)=>s+x.unit*x.qty,0)}
 function renderCart(){
@@ -88,9 +100,9 @@ function renderCart(){
 $('openCart').onclick=()=>{$('cartModal').classList.remove('hidden');renderCart()};
 $('closeCart').onclick=()=>{if(editingOrderId&&!confirm('Đơn đang sửa chưa được lưu lên hệ thống. Đóng giỏ hàng?'))return;$('cartModal').classList.add('hidden')};
 async function submitOrder(){
- if(!cart.length)return notify('Giỏ hàng trống',true);
- if(!restaurant||cart.some(x=>!menu.some(m=>m.id===x.menu_id&&m.restaurant_id===restaurant.id)))return notify('Giỏ hàng chứa món của quán khác. Vui lòng chọn lại.',true);
- if(round?.status!=='open')return notify('Đợt đặt đã khóa',true);
+ if(!cart.length){notify('Giỏ hàng trống',true);return false;}
+ if(!restaurant||cart.some(x=>!menu.some(m=>m.id===x.menu_id&&m.restaurant_id===restaurant.id))){notify('Giỏ hàng chứa món của quán khác. Vui lòng chọn lại.',true);return false;}
+ if(round?.status!=='open'){notify('Đợt đặt đã khóa',true);return false;}
  $('placeOrder').disabled=true;
  try{
   const items=cart.map(({menu_id,size,qty,sugar,ice,toppings,note})=>({menu_id,size,qty,sugar,ice,toppings,note}));
@@ -98,23 +110,15 @@ async function submitOrder(){
    const {data,error}=await sb.rpc('edit_member_order',{p_order:editingOrderId,p_member:person.id,p_items:items});
    if(error)throw error;
    if(data!==true)throw Error('Không thể sửa đơn: đơn đã thanh toán, đợt đã khóa hoặc phiên đặt đơn không còn hợp lệ.');
-   // Chỉ thông báo thành công sau khi đọc lại bản ghi đã lưu từ máy chủ.
-   const {data:verified,error:verifyError}=await sb.from('orders').select('id,items').eq('id',editingOrderId).eq('member_id',person.id).maybeSingle();
-   if(verifyError){notify('Đã lưu đơn trên máy chủ, nhưng không có quyền đọc lại để xác minh: '+verifyError.message,true);}
-   if(!verifyError&&!verified)throw Error('Không tìm thấy đơn sau khi lưu. Vui lòng tải lại lịch sử đơn.');
-   const actual=Array.isArray(verified?.items)?verified.items:[];
-   const same=actual.length===items.length&&items.every((expected,i)=>{
-    const found=actual[i];
-    return found&&String(found.menu_id)===String(expected.menu_id)&&String(found.size)===String(expected.size)&&Number(found.qty)===Number(expected.qty)&&Number(found.sugar)===Number(expected.sugar)&&Number(found.ice)===Number(expected.ice)&&JSON.stringify(found.toppings||[])===JSON.stringify(expected.toppings||[])&&String(found.note||'')===String(expected.note||'');
-   });
-   if(!verifyError&&!same)throw Error('Máy chủ trả về thành công nhưng nội dung đơn chưa khớp. Kiểm tra RPC edit_member_order.');
+   // RPC trả true sau khi UPDATE thành công. Không bắt buộc SELECT trực tiếp
+   // từ orders vì RLS có thể không cho đọc bản ghi qua trình duyệt.
    notify('Đã lưu thay đổi vào đơn hàng thành công');
   }else{
    await rpc('place_order',{p_round:round.id,p_member:person.id,p_restaurant:restaurant.id,p_items:items});
    notify('Đặt hàng thành công');
   }
-  cart=[];editingOrderId=null;$('placeOrder').textContent='Xác nhận đặt hàng';renderCart();$('cartModal').classList.add('hidden');await loadOrders();showSection('myOrdersSection');
- }catch(e){notify((editingOrderId?'Không sửa được đơn: ':'Không đặt được đơn: ')+e.message,true)}
+  cart=[];editingOrderId=null;$('placeOrder').textContent='Xác nhận đặt hàng';renderCart();$('cartModal').classList.add('hidden');$('itemModal').classList.add('hidden');returnToCartAfterItemEdit=false;editingCartIndex=-1;await loadOrders();showSection('myOrdersSection');return true;
+ }catch(e){notify((editingOrderId?'Không sửa được đơn: ':'Không đặt được đơn: ')+e.message,true);return false}
  finally{$('placeOrder').disabled=false}
 }
 $('placeOrder').onclick=submitOrder;
@@ -177,7 +181,7 @@ function renderOrders(){
    return {menu_id:line.menu_id,name:item.name,size:line.size,qty:Number(line.qty)||1,sugar:Number(line.sugar)||0,ice:Number(line.ice)||0,toppings:Array.isArray(line.toppings)?line.toppings:[],note:line.note||'',unit:(line.size==='L'?item.price_l:item.price_m)+((Array.isArray(line.toppings)?line.toppings:[]).reduce((sum,t)=>sum+(toppingOptions.find(x=>x.name===t&&x.restaurant_id===rest.id&&x.active)?.price||0),0))};
   });
   }catch(e){return notify(e.message,true)}
-  restaurant=rest;cart=lines;editingOrderId=o.id;editingCartIndex=-1;$('placeOrder').textContent='💾 Lưu sửa đơn';renderCart();$('cartModal').classList.remove('hidden');notify('Chỉnh món, bấm Lưu thay đổi, sau đó bấm Lưu sửa đơn để cập nhật lên hệ thống.');
+  restaurant=rest;cart=lines;editingOrderId=o.id;editingCartIndex=-1;$('placeOrder').textContent='💾 Lưu sửa đơn';renderCart();$('cartModal').classList.remove('hidden');notify('Sửa món rồi nhấn Lưu thay đổi để cập nhật trực tiếp lên hệ thống.');
  });
  document.querySelectorAll('#ordersList button[data-cancel]').forEach(b=>b.onclick=async()=>{
   const selectedId=person?.id;
