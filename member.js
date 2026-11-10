@@ -75,6 +75,7 @@ function renderCart(){
  document.querySelectorAll('#cartLines button[data-edit-cart]').forEach(b=>b.onclick=()=>{
   const i=Number(b.dataset.editCart),line=cart[i],item=menu.find(m=>m.id===line?.menu_id);
   if(!line||!item)return notify('Món này không còn trong menu hiện tại.',true);
+  $('cartModal').classList.add('hidden');
   openItem(item,line,i);
  });
  document.querySelectorAll('#cartLines button[data-remove-cart]').forEach(b=>b.onclick=()=>{cart.splice(Number(b.dataset.removeCart),1);renderCart()});
