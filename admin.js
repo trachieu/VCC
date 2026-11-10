@@ -70,7 +70,7 @@ function renderDebts(){
 function renderAdmin(){$('roundState').textContent=current?`${current.name} · ${current.status==='open'?'Đang mở':'Đã khóa'}`:'Chưa có đợt hiện tại';$('toggleLock').disabled=!current; $('toggleLock').textContent=!current?'Chưa có đợt':current.status==='open'?'🔒 Khóa đơn':'🔓 Mở khóa';$('toggleLock').className=current?.status==='open'?'danger':'secondary';$('roundState').className='pill '+(current?.status==='open'?'state-open':current?.status==='locked'?'state-locked':'state-none');$('archiveRound').disabled=!current;let live=orders.filter(x=>x.round_id===current?.id),people=new Set(live.map(x=>x.member_id));let paid=live.filter(x=>x.paid).reduce((a,x)=>a+x.total,0),total=live.reduce((a,x)=>a+x.total,0);$('stats').innerHTML=[['Người đặt',people.size],['Số đơn',live.length],['Số món',live.reduce((a,x)=>a+(x.items||[]).reduce((b,y)=>b+y.qty,0),0)],['Tổng tiền',money(total)],['Đã thu',money(paid)],['Chưa thu',money(total-paid)]].map(([a,b])=>`<div class="card"><div class="muted">${a}</div><div class="summary">${b}</div></div>`).join('');
 renderPaymentOrders(live);
 renderDebts();
-$('memberList').innerHTML=members.filter(x=>x.active).sort((a,b)=>a.name.localeCompare(b.name,'vi')).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-member="${x.id}">Sửa</button> <button class="danger mini" data-remove-member="${x.id}">Xóa</button></span></div>`).join('');
+renderMemberList();
 $('restaurantList').innerHTML=restaurants.filter(x=>x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-rest="${x.id}">Sửa</button> <button class="danger mini" data-remove-rest="${x.id}">Xóa</button></span></div>`).join('');
 $('menuRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderAdminMenu();$('toppingRestaurant').innerHTML=restaurants.filter(x=>x.active).map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');renderToppings();
 // Ghi nhớ đợt nào đang mở khi cập nhật dữ liệu thanh toán / nhận realtime.
@@ -95,6 +95,16 @@ document.querySelectorAll('[data-archive-pay]').forEach(e=>e.onchange=async()=>{
  }catch(error){notify(error.message,true);await reloadAdmin()}
 });
 bindAdminButtons();bindArchiveDelete()}
+// Lọc tên ngay khi gõ; danh sách vẫn theo A–Z và giữ nguyên nút Sửa/Xóa.
+function renderMemberList(){
+ const term=norm($('memberSearch').value).replace(/\s+/g,' ').trim();
+ const list=members.filter(x=>x.active && norm(x.name).includes(term))
+  .sort((a,b)=>a.name.localeCompare(b.name,'vi',{sensitivity:'base'}));
+ $('memberList').innerHTML=list.map(x=>`<div class="item row spread"><span>${safe(x.name)}</span><span><button class="secondary mini" data-edit-member="${x.id}">Sửa</button> <button class="danger mini" data-remove-member="${x.id}">Xóa</button></span></div>`).join('')||'<p class="muted">Không tìm thấy nhân viên.</p>';
+ // Nút được tạo lại sau khi lọc, vì vậy phải gắn lại xử lý cho danh sách mới.
+ bindAdminButtons();
+}
+$('memberSearch').addEventListener('input',renderMemberList);
 function renderAdminMenu(){let id=$('menuRestaurant').value;$('menuAdminList').innerHTML=menu.filter(x=>x.restaurant_id===id&&x.active).map(x=>`<div class="item row spread"><span>${safe(x.name)} (${safe(x.category)}) · M ${money(x.price_m)}${x.price_l!=null?' · L '+money(x.price_l):''}</span><span><button class="secondary mini" data-edit-menu="${x.id}">Sửa</button> <button class="danger mini" data-remove-menu="${x.id}">Xóa</button></span></div>`).join('')};$('menuRestaurant').onchange=renderAdminMenu;
 function bindAdminButtons(){for(let table of [['member','members'],['rest','restaurants'],['menu','menu_items']]){let [short,name]=table;document.querySelectorAll(`[data-remove-${short}]`).forEach(b=>b.onclick=()=>change(name,b.dataset['remove'+short[0].toUpperCase()+short.slice(1)],{active:false},'Xóa khỏi danh sách?'));document.querySelectorAll(`[data-edit-${short}]`).forEach(b=>b.onclick=async()=>{let id=b.dataset['edit'+short[0].toUpperCase()+short.slice(1)],obj=({members,restaurants,menu_items:menu})[name].find(x=>x.id===id);if(!obj)return;let patch={};if(short==='menu'){let n=prompt('Tên món',obj.name);if(n===null)return;let p=prompt('Giá M (đ)',obj.price_m);if(p===null)return;let l=prompt('Giá L (để trống nếu không có)',obj.price_l??'');if(l===null)return;patch={name:n.trim(),price_m:Number(p),price_l:l.trim()?Number(l):null};if(!n.trim()||!Number.isFinite(patch.price_m)||patch.price_m<0||patch.price_l!==null&&(!Number.isFinite(patch.price_l)||patch.price_l<0))return notify('Giá không hợp lệ',true)}else{let n=prompt('Tên mới',obj.name);if(!n?.trim())return;patch={name:n.trim()}}await change(name,id,patch)})}}
 async function change(table,id,patch,message){if(message&&!confirm(message))return;try{let{error}=await sb.from(table).update(patch).eq('id',id);if(error)throw error;await reloadAdmin();notify('Đã cập nhật')}catch(e){notify(e.message,true)}}
