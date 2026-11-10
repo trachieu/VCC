@@ -218,3 +218,7 @@ main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-rig
 
 /* Nhập giờ 24h */
 #roundDeadlineDate{min-width:165px}#roundDeadlineTime{width:86px;min-width:86px;font-variant-numeric:tabular-nums;text-align:center}@media(max-width:600px){#roundDeadlineDate{flex:1;min-width:155px}#roundDeadlineTime{width:95px;flex:0 0 95px}}
+
+/* Giữ dòng trạng thái và thời gian khóa gọn trên màn hình nhỏ */
+#roundInfo{display:inline-block;font-variant-numeric:tabular-nums;line-height:1.5;white-space:normal}
+#sidebarRoundStatus{font-variant-numeric:tabular-nums}

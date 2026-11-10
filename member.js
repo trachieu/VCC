@@ -7,21 +7,27 @@ let allRounds=[];
 function orderRound(o){return allRounds.find(r=>r.id===o.round_id)||null;}
 function roundTakingOrders(){return !!round&&round.status==='open'&&(!round.closes_at||Date.now()<new Date(round.closes_at).getTime())}
 function memberDeadlineTick(){
- const el=$('memberDeadline');if(!el)return;
- if(!round){el.textContent='';return}
- if(round.status!=='open'){el.textContent='Đợt đã khóa';return}
- if(!round.closes_at){el.textContent='Chưa có giờ tự khóa';return}
- const ms=new Date(round.closes_at).getTime()-Date.now();
- if(ms>0)window.vccExpiryRendered=false;
- if(ms<=0){
-  el.textContent='Hết thời gian đặt món';
-  $('roundInfo').textContent='Đã khóa đơn';
-  if(!window.vccExpiryRendered){window.vccExpiryRendered=true;if(restaurant&& !$('menuSection').classList.contains('hidden'))renderMenu();if(!$('myOrdersSection').classList.contains('hidden'))renderOrders();}
-  if(!deadlineSyncBusy&&Date.now()-lastDeadlineSync>15000){deadlineSyncBusy=true;lastDeadlineSync=Date.now();sb.rpc('close_expired_rounds').then(()=>reload()).catch(e=>console.warn(e)).finally(()=>deadlineSyncBusy=false)}
-  return;
+ const badge=$('roundInfo');
+ const side=$('sidebarRoundStatus');
+ let status='Chưa có đợt đặt món';
+ if(round){
+  if(round.status!=='open')status='Đã khóa đơn';
+  else if(!round.closes_at)status='Đang nhận đơn';
+  else{
+   const ms=new Date(round.closes_at).getTime()-Date.now();
+   if(ms>0){
+    window.vccExpiryRendered=false;
+    const secs=Math.ceil(ms/1000),hours=Math.floor(secs/3600),mins=Math.floor((secs%3600)/60),seconds=secs%60;
+    status=`Đang nhận đơn · Khóa sau ${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+   }else{
+    status='Đã hết thời gian đặt món';
+    if(!window.vccExpiryRendered){window.vccExpiryRendered=true;if(restaurant&&!$('menuSection').classList.contains('hidden'))renderMenu();if(!$('myOrdersSection').classList.contains('hidden'))renderOrders();}
+    if(!deadlineSyncBusy&&Date.now()-lastDeadlineSync>15000){deadlineSyncBusy=true;lastDeadlineSync=Date.now();sb.rpc('close_expired_rounds').then(()=>reload()).catch(e=>console.warn(e)).finally(()=>deadlineSyncBusy=false)}
+   }
+  }
  }
- const secs=Math.ceil(ms/1000),hours=Math.floor(secs/3600),mins=Math.floor((secs%3600)/60),seconds=secs%60;
- el.textContent=`Thời gian còn lại: ${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+ if(badge)badge.textContent=status;
+ if(side)side.textContent=status;
 }
 let deadlineSyncBusy=false, lastDeadlineSync=0;
 setInterval(memberDeadlineTick,1000);
@@ -40,7 +46,7 @@ $('personSearch').oninput=()=>{person=null;$('goBtn').disabled=true;$('selectedN
 $('personSearch').onfocus=()=>{if($('personSearch').value.trim())renderNames()};
 function resetToLogin(){person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
 $('goBtn').onclick=()=>showApp();$('changePerson').onclick=resetToLogin;
-async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;$('roundInfo').textContent=round?(roundTakingOrders()?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt đặt món';renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
+async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
 function showSection(id){for(let s of ['restaurantsSection','menuSection','myOrdersSection'])$(s).classList.toggle('hidden',s!==id);$('memberSidebar').classList.toggle('hidden',id!=='myOrdersSection')}
 function renderRestaurants(){$('restaurants').innerHTML=restaurants.length?restaurants.map(x=>`<div class="card"><h3>${safe(x.name)}</h3><button data-id="${x.id}">Xem menu</button></div>`).join(''):'<p>Chưa có quán. Quản trị cần thêm quán.</p>';document.querySelectorAll('#restaurants button').forEach(b=>b.onclick=()=>{const nextRestaurant=restaurants.find(r=>r.id===b.dataset.id);
  if(!nextRestaurant)return;
@@ -265,5 +271,5 @@ function updateMemberStats(mine,current){
   $('statQty').textContent=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
   $('statTotal').textContent=money(mine.reduce((s,o)=>s+(Number(o.total)||0),0));
   $('statUnpaid').textContent=money(mine.filter(o=>!o.paid).reduce((s,o)=>s+(Number(o.total)||0),0));
-  $('sidebarRoundStatus').textContent=round?(roundTakingOrders()?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt';
+  memberDeadlineTick();
 }
