@@ -5,8 +5,29 @@ let returnToCartAfterItemEdit=false;
 let activeUser=null;
 let allRounds=[];
 function orderRound(o){return allRounds.find(r=>r.id===o.round_id)||null;}
+function roundTakingOrders(){return !!round&&round.status==='open'&&(!round.closes_at||Date.now()<new Date(round.closes_at).getTime())}
+function memberDeadlineTick(){
+ const el=$('memberDeadline');if(!el)return;
+ if(!round){el.textContent='';return}
+ if(round.status!=='open'){el.textContent='Đợt đã khóa';return}
+ if(!round.closes_at){el.textContent='Chưa có giờ tự khóa';return}
+ const ms=new Date(round.closes_at).getTime()-Date.now();
+ if(ms>0)window.vccExpiryRendered=false;
+ if(ms<=0){
+  el.textContent='Hết thời gian đặt món';
+  $('roundInfo').textContent='Đã khóa đơn';
+  if(!window.vccExpiryRendered){window.vccExpiryRendered=true;if(restaurant&& !$('menuSection').classList.contains('hidden'))renderMenu();if(!$('myOrdersSection').classList.contains('hidden'))renderOrders();}
+  if(!deadlineSyncBusy&&Date.now()-lastDeadlineSync>15000){deadlineSyncBusy=true;lastDeadlineSync=Date.now();sb.rpc('close_expired_rounds').then(()=>reload()).catch(e=>console.warn(e)).finally(()=>deadlineSyncBusy=false)}
+  return;
+ }
+ const secs=Math.ceil(ms/1000),hours=Math.floor(secs/3600),mins=Math.floor((secs%3600)/60),seconds=secs%60;
+ el.textContent=`Thời gian còn lại: ${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+}
+let deadlineSyncBusy=false, lastDeadlineSync=0;
+setInterval(memberDeadlineTick,1000);
+
 async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();}catch(e){notify('Không kết nối được: '+e.message,true)}}
-async function reload(){[members,restaurants,menu,toppingOptions]=await Promise.all([query('members'),query('restaurants'),query('menu_items'),query('toppings')]);members=members.filter(x=>x.active);restaurants=restaurants.filter(x=>x.active);menu=menu.filter(x=>x.active);allRounds=await query('order_rounds');round=allRounds.filter(x=>x.status!=='archived').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]||null;renderNames();if(person){const latest=members.find(x=>x.id===person.id);if(!latest){resetToLogin();return}person=latest;const currentlyVisible=['restaurantsSection','menuSection','myOrdersSection'].find(id=>!$(id).classList.contains('hidden'));await showApp(currentlyVisible)}}
+async function reload(){[members,restaurants,menu,toppingOptions]=await Promise.all([query('members'),query('restaurants'),query('menu_items'),query('toppings')]);members=members.filter(x=>x.active);restaurants=restaurants.filter(x=>x.active);menu=menu.filter(x=>x.active);allRounds=await query('order_rounds');round=allRounds.filter(x=>x.status!=='archived').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]||null;memberDeadlineTick();renderNames();if(person){const latest=members.find(x=>x.id===person.id);if(!latest){resetToLogin();return}person=latest;const currentlyVisible=['restaurantsSection','menuSection','myOrdersSection'].find(id=>!$(id).classList.contains('hidden'));await showApp(currentlyVisible)}}
 function renderNames(){
  let q=norm($('personSearch').value.trim());
  if(!q){$('hintList').innerHTML='';$('hintList').classList.add('hidden');return}
@@ -19,7 +40,7 @@ $('personSearch').oninput=()=>{person=null;$('goBtn').disabled=true;$('selectedN
 $('personSearch').onfocus=()=>{if($('personSearch').value.trim())renderNames()};
 function resetToLogin(){person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
 $('goBtn').onclick=()=>showApp();$('changePerson').onclick=resetToLogin;
-async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;$('roundInfo').textContent=round?(round.status==='open'?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt đặt món';renderRestaurants();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
+async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;$('roundInfo').textContent=round?(roundTakingOrders()?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt đặt món';renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
 function showSection(id){for(let s of ['restaurantsSection','menuSection','myOrdersSection'])$(s).classList.toggle('hidden',s!==id);$('memberSidebar').classList.toggle('hidden',id!=='myOrdersSection')}
 function renderRestaurants(){$('restaurants').innerHTML=restaurants.length?restaurants.map(x=>`<div class="card"><h3>${safe(x.name)}</h3><button data-id="${x.id}">Xem menu</button></div>`).join(''):'<p>Chưa có quán. Quản trị cần thêm quán.</p>';document.querySelectorAll('#restaurants button').forEach(b=>b.onclick=()=>{const nextRestaurant=restaurants.find(r=>r.id===b.dataset.id);
  if(!nextRestaurant)return;
@@ -35,7 +56,7 @@ function renderMenu(){
  if(selectedCategory!=='Tất cả'&&!categories.includes(selectedCategory))selectedCategory='Tất cả';
  $('menuCategories').innerHTML=['Tất cả',...categories].map(c=>`<button class="${c===selectedCategory?'':'secondary'} mini" data-category="${safe(c)}">${safe(c)}</button>`).join('');
  document.querySelectorAll('#menuCategories button').forEach(b=>b.onclick=()=>{selectedCategory=b.dataset.category;renderMenu()});
- $('menuList').innerHTML=items.filter(x=>(selectedCategory==='Tất cả'||(x.category||'Khác')===selectedCategory)&&norm(x.name).includes(q)).map(x=>`<div class="card"><strong>${safe(x.name)}</strong><p class="muted">${safe(x.category)} · M ${money(x.price_m)} ${x.price_l!=null?' · L '+money(x.price_l):''}</p><button data-id="${x.id}" ${round?.status!=='open'?'disabled':''}>Chọn món</button></div>`).join('')||'<p>Chưa có món.</p>';
+ $('menuList').innerHTML=items.filter(x=>(selectedCategory==='Tất cả'||(x.category||'Khác')===selectedCategory)&&norm(x.name).includes(q)).map(x=>`<div class="card"><strong>${safe(x.name)}</strong><p class="muted">${safe(x.category)} · M ${money(x.price_m)} ${x.price_l!=null?' · L '+money(x.price_l):''}</p><button data-id="${x.id}" ${!roundTakingOrders()?'disabled':''}>Chọn món</button></div>`).join('')||'<p>Chưa có món.</p>';
  document.querySelectorAll('#menuList button[data-id]').forEach(b=>b.onclick=()=>openItem(menu.find(i=>i.id===b.dataset.id)));
 }
 $('searchMenu').oninput=renderMenu;
@@ -123,7 +144,7 @@ $('closeCart').onclick=()=>{if(editingOrderId&&!confirm('Các thay đổi chưa 
 async function submitOrder(){
  if(!cart.length){notify('Giỏ hàng trống',true);return false;}
  if(!restaurant||cart.some(x=>!menu.some(m=>m.id===x.menu_id&&m.restaurant_id===restaurant.id))){notify('Giỏ hàng chứa món của quán khác. Vui lòng chọn lại.',true);return false;}
- if(!editingOrderId&&round?.status!=='open'){notify('Đợt đặt món hiện không mở',true);return false;}
+ if(!roundTakingOrders()){notify('Đợt đặt món đã khóa hoặc hết giờ',true);return false;}
  $('placeOrder').disabled=true;
  try{
   const items=cart.map(({menu_id,size,qty,sugar,ice,toppings,note})=>({menu_id,size,qty,sugar,ice,toppings,note}));
@@ -194,8 +215,8 @@ function renderOrders(){
  const previous=mine.filter(o=>o.round_id!==round?.id);
  function orderHtml(o,isCurrent){
   // Chỉ sửa đơn chưa thanh toán thuộc đợt hiện tại khi Admin đang mở đơn.
-  const canEdit=!o.paid&&isCurrent&&round?.status==='open';
-  const canCancel=!o.paid&&isCurrent&&round?.status==='open';
+  const canEdit=!o.paid&&isCurrent&&roundTakingOrders();
+  const canCancel=!o.paid&&isCurrent&&roundTakingOrders();
   return `<div class="item"><div class="row spread"><strong>${ts(o.created_at)} · ${money(o.total)}</strong><span class="pill">${o.paid?'✅ Đã thanh toán':'Chưa thanh toán'}</span></div><p>${safe(formatItems(o.items))}</p><div class="row">${!o.paid?`<button class="mini" data-pay="${o.id}">💳 Thanh toán</button>`:''}${canEdit?`<button class="secondary mini" data-edit-order="${o.id}">✏️ Sửa đơn</button>`:''}${canCancel?`<button class="danger mini" data-cancel="${o.id}">Hủy đơn</button>`:''}</div></div>`;
  }
  updateMemberStats(mine,current);
@@ -208,7 +229,7 @@ function renderOrders(){
  document.querySelectorAll('#ordersList button[data-edit-order]').forEach(b=>b.onclick=()=>{
   const o=myOrders.find(x=>x.id===b.dataset.editOrder&&x.member_id===person?.id&&!x.paid);
   if(!o)return notify('Không tìm thấy đơn chưa thanh toán.',true);
-  if(o.round_id!==round?.id||round?.status!=='open')return notify('Đợt đã khóa, không thể sửa đơn.',true);
+  if(o.round_id!==round?.id||!roundTakingOrders())return notify('Đợt đã khóa, không thể sửa đơn.',true);
   if(cart.length&&!confirm('Giỏ hàng hiện tại sẽ được thay bằng các món của đơn này. Tiếp tục?'))return;
   const rest=restaurants.find(r=>r.id===o.restaurant_id);
   if(!rest)return notify('Quán của đơn này không còn hoạt động.',true);
@@ -223,7 +244,7 @@ function renderOrders(){
  document.querySelectorAll('#ordersList button[data-cancel]').forEach(b=>b.onclick=async()=>{
   const selectedId=person?.id;
   const o=myOrders.find(x=>x.id===b.dataset.cancel&&x.member_id===selectedId&&x.round_id===round?.id&&!x.paid);
-  if(!o||round?.status!=='open')return notify('Không thể hủy đơn này.',true);
+  if(!o||!roundTakingOrders())return notify('Không thể hủy đơn này.',true);
   if(!confirm('Hủy đơn này?'))return;
   b.disabled=true;
   try{
@@ -244,5 +265,5 @@ function updateMemberStats(mine,current){
   $('statQty').textContent=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
   $('statTotal').textContent=money(mine.reduce((s,o)=>s+(Number(o.total)||0),0));
   $('statUnpaid').textContent=money(mine.filter(o=>!o.paid).reduce((s,o)=>s+(Number(o.total)||0),0));
-  $('sidebarRoundStatus').textContent=round?(round.status==='open'?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt';
+  $('sidebarRoundStatus').textContent=round?(roundTakingOrders()?'Đang nhận đơn':'Đã khóa đơn'):'Chưa có đợt';
 }

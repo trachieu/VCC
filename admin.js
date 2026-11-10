@@ -33,7 +33,7 @@ $('signIn').onclick=async()=>{
 ['email','password'].forEach(id=>$(id).addEventListener('input',()=>loginFeedback('')));
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('signIn').click()});
 $('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
-async function reloadAdmin(){try{[members,restaurants,menu,toppingOptions,rounds,orders]=await Promise.all(['members','restaurants','menu_items','toppings','order_rounds','orders'].map(query));rounds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));current=rounds.find(x=>x.status!=='archived')||null;history=rounds.filter(x=>x.status==='archived');renderAdmin()}catch(e){notify(e.message,true)}}
+async function reloadAdmin(){try{[members,restaurants,menu,toppingOptions,rounds,orders]=await Promise.all(['members','restaurants','menu_items','toppings','order_rounds','orders'].map(query));rounds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));current=rounds.find(x=>x.status!=='archived')||null;history=rounds.filter(x=>x.status==='archived');renderAdmin(); updateAdminDeadline()}catch(e){notify(e.message,true)}}
 function renderPaymentOrders(live){
  const sortedLive=[...live].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const paidLive=sortedLive.filter(x=>x.paid),unpaidLive=sortedLive.filter(x=>!x.paid);
@@ -172,7 +172,86 @@ function renderToppings(){const restaurantId=$('toppingRestaurant').value;$('top
 $('toppingRestaurant').onchange=renderToppings;
 $('addTopping').onclick=()=>{const name=$('toppingName').value.trim(),price=$('toppingPrice').value,restaurant_id=$('toppingRestaurant').value;if(!restaurant_id||!name||price===''||!Number.isSafeInteger(Number(price))||Number(price)<0)return notify('Nhập tên và giá topping hợp lệ',true);add('toppings',{name,price:Number(price),restaurant_id},['toppingName','toppingPrice'])};
 
-$('newRound').onclick=async()=>{if(current)return notify('Hãy kết thúc đợt hiện tại trước',true);let name=$('roundName').value.trim();if(name)await add('order_rounds',{name,status:'open'},['roundName'])};$('toggleLock').onclick=()=>current&&change('order_rounds',current.id,{status:current.status==='open'?'locked':'open'});$('archiveRound').onclick=()=>current&&change('order_rounds',current.id,{status:'archived'},'Kết thúc đợt này? Lịch sử sẽ không sửa được.');$('refreshOrders').onclick=reloadAdmin;
+// Giờ 24h: nhập HH:mm, mặc định thời điểm hiện tại khi chưa có hẹn giờ.
+let deadlineDraftDirty=false;
+let deadlineDraftRoundKey=null;
+function localDateParts(date){
+ const d=new Date(date),z=n=>String(n).padStart(2,'0');
+ return {day:`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`,time:`${z(d.getHours())}:${z(d.getMinutes())}`};
+}
+function fillDeadlineDraft(date){
+ const {day,time}=localDateParts(date);
+ $('roundDeadlineDate').value=day;
+ $('roundDeadlineTime').value=time;
+}
+function readDeadlineDraft(){
+ const date=$('roundDeadlineDate').value,time=$('roundDeadlineTime').value.trim();
+ if(!date||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))throw Error('Nhập ngày và giờ theo định dạng 24 giờ (HH:mm).');
+ const dt=new Date(`${date}T${time}:00`);
+ if(!Number.isFinite(dt.getTime())||localDateParts(dt).day!==date||localDateParts(dt).time!==time)throw Error('Ngày hoặc giờ không hợp lệ.');
+ return dt;
+}
+function updateAdminDeadline(){
+ const key=current?.id||'new';
+ if(deadlineDraftRoundKey!==key){
+  deadlineDraftRoundKey=key;
+  deadlineDraftDirty=false;
+  fillDeadlineDraft(current?.closes_at||new Date());
+ }
+ $('saveRoundDeadline').disabled=!current;
+ $('clearRoundDeadline').disabled=!current||!current.closes_at;
+ const target=current?.closes_at?new Date(current.closes_at).getTime():null;
+ $('adminDeadlineInfo').textContent=!current?'':!target?'Chưa hẹn giờ':
+   (Date.now()>=target?'Đã hết giờ':'Tự khóa lúc '+new Date(target).toLocaleString('vi-VN',{hour12:false}));
+}
+['roundDeadlineDate','roundDeadlineTime'].forEach(id=>$(id).addEventListener('input',()=>{deadlineDraftDirty=true}));
+$('saveRoundDeadline').onclick=async()=>{
+ if(!current)return;
+ let deadline;
+ try{deadline=readDeadlineDraft()}catch(e){return notify(e.message,true)}
+ if(deadline.getTime()<=Date.now()+15000)return notify('Giờ tự khóa phải ở tương lai.',true);
+ const btn=$('saveRoundDeadline');btn.disabled=true;
+ try{
+  const {data,error}=await sb.from('order_rounds').update({closes_at:deadline.toISOString()}).eq('id',current.id).select('id,closes_at').single();
+  if(error)throw error;
+  if(!data||new Date(data.closes_at).getTime()!==deadline.getTime())throw Error('Không xác nhận được thời gian đã lưu');
+  deadlineDraftDirty=false;
+  await reloadAdmin();notify('Đã lưu giờ tự khóa đơn');
+ }catch(e){notify('Không lưu được hẹn giờ: '+e.message,true)}finally{btn.disabled=false}
+};
+$('clearRoundDeadline').onclick=async()=>{
+ if(!current)return;
+ const btn=$('clearRoundDeadline');btn.disabled=true;
+ try{
+  const {error}=await sb.from('order_rounds').update({closes_at:null}).eq('id',current.id);
+  if(error)throw error;
+  deadlineDraftRoundKey=null;deadlineDraftDirty=false;
+  await reloadAdmin();notify('Đã bỏ hẹn giờ');
+ }catch(e){notify('Không bỏ được hẹn giờ: '+e.message,true)}finally{btn.disabled=false}
+};
+let adminAutoLockBusy=false;
+async function adminDeadlineTick(){
+ if(!current){return}
+ const end=current.closes_at?new Date(current.closes_at).getTime():null;
+ if(!end||current.status!=='open'||Date.now()<end){updateAdminDeadline();return}
+ if(adminAutoLockBusy)return;
+ adminAutoLockBusy=true;
+ try{const {error}=await sb.rpc('close_expired_rounds');if(error)throw error;await reloadAdmin()}
+ catch(e){console.warn('Không đồng bộ được tự khóa:',e.message);await reloadAdmin()}
+ finally{adminAutoLockBusy=false}
+}
+setInterval(adminDeadlineTick,5000);
+$('newRound').onclick=async()=>{
+ if(current)return notify('Hãy kết thúc đợt hiện tại trước',true);
+ const name=$('roundName').value.trim();if(!name)return notify('Nhập tên đợt mới.',true);
+ const row={name,status:'open'};
+ if(deadlineDraftDirty){
+  let dt;try{dt=readDeadlineDraft()}catch(e){return notify(e.message,true)}
+  if(dt.getTime()<=Date.now()+15000)return notify('Giờ tự khóa phải ở tương lai.',true);
+  row.closes_at=dt.toISOString();
+ }
+ await add('order_rounds',row,['roundName']);
+};$('toggleLock').onclick=()=>{if(!current)return;if(current.status==='locked'&&current.closes_at&&new Date(current.closes_at).getTime()<=Date.now())return notify('Đã hết giờ hẹn. Hãy sửa giờ kết thúc hoặc bỏ hẹn giờ trước khi mở khóa.',true);change('order_rounds',current.id,{status:current.status==='open'?'locked':'open'})};$('archiveRound').onclick=()=>current&&change('order_rounds',current.id,{status:'archived'},'Kết thúc đợt này? Lịch sử sẽ không sửa được.');$('refreshOrders').onclick=reloadAdmin;
 document.querySelectorAll('[data-payment-filter]').forEach(b=>b.onclick=()=>{paymentFilter=b.dataset.paymentFilter;const live=orders.filter(x=>x.round_id===current?.id);renderPaymentOrders(live)});
 
 function rowsFor(arr){return arr.map(o=>({Nguoi_dat:members.find(m=>m.id===o.member_id)?.name||'Đã xóa',Quan:restaurants.find(r=>r.id===o.restaurant_id)?.name||'Quán',Mon:formatItems(o.items),Tong_tien:Number(o.total)||0,Thanh_toan:o.paid?'Đã thanh toán':'Chưa thanh toán',Ngay_dat:ts(o.created_at),Dot:rounds.find(x=>x.id===o.round_id)?.name||''}))}

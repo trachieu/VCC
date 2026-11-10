@@ -212,3 +212,9 @@ main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-rig
 
 /* V16.39: cài đặt QR của quản trị */
 .qr-settings{max-width:500px;display:grid;gap:10px}.qr-settings label{font-weight:700}.qr-settings input,.qr-settings select{width:100%;max-width:100%}.qr-settings button{justify-self:start;margin-top:8px}.qr-settings #qrSettingsStatus{min-height:1.3em}@media(max-width:600px){.qr-settings button{width:100%}}
+
+/* Hẹn giờ khóa đơn */
+.round-deadline-settings{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}.round-deadline-settings label{font-weight:650}.round-deadline-settings input{min-width:210px}.member-deadline{font-weight:700;margin-top:10px;font-variant-numeric:tabular-nums;color:#176b46}.member-deadline:empty{display:none}@media(max-width:600px){.round-deadline-settings input{width:100%}}
+
+/* Nhập giờ 24h */
+#roundDeadlineDate{min-width:165px}#roundDeadlineTime{width:86px;min-width:86px;font-variant-numeric:tabular-nums;text-align:center}@media(max-width:600px){#roundDeadlineDate{flex:1;min-width:155px}#roundDeadlineTime{width:95px;flex:0 0 95px}}
