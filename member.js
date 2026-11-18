@@ -195,8 +195,35 @@ async function showPayment(o){
  $('payQr').removeAttribute('src');$('payQrLink').removeAttribute('href');
  $('qrIssue').textContent='Đang tải thông tin chuyển khoản…';
  try{
-  const {data,error}=await sb.from('payment_settings').select('bank_bin,bank_name,account_number,account_name').eq('id',1).single();
-  if(error)throw error;
+  // Đợt còn mở: dùng STK đang cấu hình. Đợt đã khóa/kết thúc: dùng STK chốt lúc khóa.
+  // Đọc từ Supabase mỗi lần mở QR để không dùng thông tin đợt đã lỗi thời trong trình duyệt.
+  const {data:orderRound,error:roundError}=await sb.from('order_rounds')
+    .select('status,closes_at,qr_bank_bin,qr_bank_name,qr_account_number,qr_account_name')
+    .eq('id',o.round_id).single();
+  if(roundError)throw roundError;
+  if(!orderRound)throw Error('Không tìm thấy đợt đặt hàng');
+  let data;
+  if(orderRound.status==='open' && (!orderRound.closes_at || new Date(orderRound.closes_at).getTime()>Date.now())){
+    const response=await sb.from('payment_settings').select('bank_bin,bank_name,account_number,account_name').eq('id',1).single();
+    if(response.error)throw response.error;
+    data=response.data;
+  }else{
+    // Nếu hết giờ nhưng DB chưa chốt (cron chưa chạy), yêu cầu chốt trước khi hiện QR.
+    if(orderRound.status==='open'){
+      const {error:closeError}=await sb.rpc('close_expired_rounds');
+      if(closeError)throw closeError;
+    }
+    const {data:lockedRound,error:lockedError}=await sb.from('order_rounds')
+      .select('status,qr_bank_bin,qr_bank_name,qr_account_number,qr_account_name')
+      .eq('id',o.round_id).single();
+    if(lockedError)throw lockedError;
+    if(lockedRound.status==='open')throw Error('Đợt chưa được chốt QR. Vui lòng thử lại.');
+    if(!lockedRound.qr_bank_bin||!lockedRound.qr_account_number||!lockedRound.qr_account_name){
+      throw Error('Đợt cũ chưa lưu tài khoản nhận tiền. Hãy liên hệ Admin để lấy đúng số tài khoản.');
+    }
+    data={bank_bin:lockedRound.qr_bank_bin,bank_name:lockedRound.qr_bank_name,
+      account_number:lockedRound.qr_account_number,account_name:lockedRound.qr_account_name};
+  }
   if($('payModal').classList.contains('hidden'))return;
   if(!/^\d{6}$/.test(data.bank_bin)||!/^\d{4,25}$/.test(data.account_number)||!data.account_name)throw Error('Thông tin ngân hàng chưa hợp lệ');
   const url=`https://img.vietqr.io/image/${data.bank_bin}-${data.account_number}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(data.account_name)}`;
@@ -207,7 +234,7 @@ async function showPayment(o){
   $('payQrLink').href=url;
   $('payQr').src=url;
  }catch(e){
-  $('qrIssue').textContent='Không tải được thông tin chuyển khoản. Vui lòng báo quản trị kiểm tra cài đặt QR.';
+  $('qrIssue').textContent=e.message||'Không tải được thông tin chuyển khoản. Vui lòng báo quản trị.';
   $('payQrLink').removeAttribute('href');
  }
 }
