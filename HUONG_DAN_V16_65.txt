@@ -1,0 +1,7 @@
+VCC V16.65 (nền V16.64)
+- Bỏ dòng hướng dẫn "Quét mã bằng ứng dụng ngân hàng. Số tiền và nội dung đã điền sẵn."
+- Bỏ hướng dẫn sau khi chuyển khoản ở cuối khung QR.
+- Khi quay về từ ngân hàng không hiển thị thông báo đầu trang, không hiển thị chữ đang chuyển tiếp tại return.html.
+- Giữ logic chỉ tự tích nếu callback status=1 như V16.64 (không phải xác nhận tiền vào từ ngân hàng).
+
+Cập nhật GitHub Pages: thay index.html, member.js và return.html (hoặc toàn bộ web). Không cần chạy SQL mới nếu V16.64 đã hoạt động.

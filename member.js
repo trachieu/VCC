@@ -63,6 +63,8 @@ async function restoreBankReturnState(){
  const params=new URLSearchParams(location.search);
  const returnValue=params.get('vcc_return')||'';
  if(!/^1(?:$|[?&])/.test(returnValue))return;
+ // Không hiển thị thông báo khi trở về từ ứng dụng ngân hàng.
+ const returnNotice=$('notice'); if(returnNotice){returnNotice.classList.add('hidden');returnNotice.textContent='';}
  const embeddedStatus=(returnValue.match(/[?&]status=([^&]+)/i)||[])[1]||'';
  const status=params.get('vcc_status')||params.get('status')||embeddedStatus;
  const failed=params.get('vcc_failed')==='1'||[...params.entries()].some(([k,v])=>
