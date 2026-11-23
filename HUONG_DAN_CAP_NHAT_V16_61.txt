@@ -1,0 +1,9 @@
+VCC V16.61 – bản đầy đủ
+
+- Tải toàn bộ các file HTML, CSS, JS lên đúng thư mục VCC, ghi đè file trùng tên.
+- Không xóa repo hay dữ liệu Supabase.
+- Nếu chưa chạy, thực thi SUPABASE_CHAN_XAC_NHAN_NHAM_V16_60.sql trong Supabase SQL Editor để thu hồi quyền tự xác nhận thanh toán khi quay về.
+- Không chạy lại những SQL thiết lập cũ nếu đã áp dụng.
+- Trình duyệt không thể đảm bảo ẩn trang lỗi của dl.vietqr.io. Nếu ứng dụng chưa cài, quay về VCC và quét QR.
+- Không tự đánh dấu đã thanh toán chỉ vì quay về. Admin vẫn xác nhận thủ công.
+- Bản này chưa kiểm thử trên Supabase thực tế.
