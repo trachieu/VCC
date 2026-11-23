@@ -39,18 +39,34 @@ function saveBankReturnState(){
  try{localStorage.setItem(BANK_RETURN_KEY,JSON.stringify({userId:activeUser,memberId:person.id,orderId:currentBankPayment.orderId,time:Date.now()}));}catch(_){}
 }
 async function restoreBankReturnState(){
+ // Chỉ ghi nhận khi VietQR đưa người dùng quay về đúng URL callback.
+ const params=new URLSearchParams(location.search);
+ if(params.get('vcc_return')!=='1')return;
  let pending=null;
  try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null');}catch(_){}
  try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
- if(!pending||pending.userId!==activeUser||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
+ // Xóa tham số callback để reload trang không vô tình xử lý lại.
+ try{const u=new URL(location.href);u.searchParams.delete('vcc_return');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(_){}
+ if(!pending||pending.userId!==activeUser||!pending.memberId||!pending.orderId||
+    !Number.isFinite(pending.time)||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
  const matchingMember=members.find(m=>m.id===pending.memberId);
  if(!matchingMember)return;
  person=matchingMember;
  await showApp('myOrdersSection');
  const order=myOrders.find(o=>o.id===pending.orderId&&o.member_id===person.id);
- if(order&&!order.paid){
-  await showPayment(order);
-  if(currentBankPayment){renderSupportedBankApps();$('bankAppChoice').classList.remove('hidden');}
+ if(!order){notify('Không tìm thấy đơn vừa mở thanh toán.',true);return;}
+ if(order.paid){notify('Đơn đã được đánh dấu thanh toán');return;}
+ try{
+  const {data,error}=await sb.rpc('member_confirm_payment_return',{
+   p_order:pending.orderId,p_member:pending.memberId
+  });
+  if(error)throw error;
+  if(data!==true)throw Error('Không thể cập nhật đơn hoặc phiên đặt đơn không còn hợp lệ.');
+  await loadOrders();
+  notify('Đã đánh dấu thanh toán');
+ }catch(e){
+  notify('Chưa thể đánh dấu thanh toán: '+e.message,true);
+  // Khi thất bại, giữ màn hình đơn hàng để người dùng thử lại qua QR / báo Admin.
  }
 }
 async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();}catch(e){notify('Không kết nối được: '+e.message,true)}}
