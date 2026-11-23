@@ -32,7 +32,28 @@ function memberDeadlineTick(){
 let deadlineSyncBusy=false, lastDeadlineSync=0;
 setInterval(memberDeadlineTick,1000);
 
-async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();}catch(e){notify('Không kết nối được: '+e.message,true)}}
+// Chỉ lưu tạm đơn đang thanh toán để khôi phục giao diện khi ngân hàng quay lại.
+const BANK_RETURN_KEY='vcc_bank_return_pending_v1654';
+function saveBankReturnState(){
+ if(!person||!activeUser||!currentBankPayment?.orderId)return;
+ try{localStorage.setItem(BANK_RETURN_KEY,JSON.stringify({userId:activeUser,memberId:person.id,orderId:currentBankPayment.orderId,time:Date.now()}));}catch(_){}
+}
+async function restoreBankReturnState(){
+ let pending=null;
+ try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null');}catch(_){}
+ try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
+ if(!pending||pending.userId!==activeUser||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
+ const matchingMember=members.find(m=>m.id===pending.memberId);
+ if(!matchingMember)return;
+ person=matchingMember;
+ await showApp('myOrdersSection');
+ const order=myOrders.find(o=>o.id===pending.orderId&&o.member_id===person.id);
+ if(order&&!order.paid){
+  await showPayment(order);
+  if(currentBankPayment){renderSupportedBankApps();$('bankAppChoice').classList.remove('hidden');}
+ }
+}
+async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();}catch(e){notify('Không kết nối được: '+e.message,true)}}
 async function reload(){[members,restaurants,menu,toppingOptions]=await Promise.all([query('members'),query('restaurants'),query('menu_items'),query('toppings')]);members=members.filter(x=>x.active);restaurants=restaurants.filter(x=>x.active);menu=menu.filter(x=>x.active);allRounds=await query('order_rounds');round=allRounds.filter(x=>x.status!=='archived').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]||null;memberDeadlineTick();renderNames();if(person){const latest=members.find(x=>x.id===person.id);if(!latest){resetToLogin();return}person=latest;const currentlyVisible=['restaurantsSection','menuSection','myOrdersSection'].find(id=>!$(id).classList.contains('hidden'));await showApp(currentlyVisible)}}
 function renderNames(){
  let q=norm($('personSearch').value.trim());
@@ -44,7 +65,7 @@ function renderNames(){
 }
 $('personSearch').oninput=()=>{person=null;$('goBtn').disabled=true;$('selectedName').textContent='Chưa chọn tên';renderNames()};
 $('personSearch').onfocus=()=>{if($('personSearch').value.trim())renderNames()};
-function resetToLogin(){person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');currentBankPayment=null;$('bankAppChoice').classList.add('hidden');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
+function resetToLogin(){try{localStorage.removeItem(BANK_RETURN_KEY)}catch(_){}person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');currentBankPayment=null;$('bankAppChoice').classList.add('hidden');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
 $('goBtn').onclick=()=>showApp();$('changePerson').onclick=resetToLogin;
 async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
 function showSection(id){for(let s of ['restaurantsSection','menuSection','myOrdersSection'])$(s).classList.toggle('hidden',s!==id);$('memberSidebar').classList.toggle('hidden',id!=='myOrdersSection')}
@@ -190,6 +211,18 @@ const BANK_DEEPLINK_CODES={
  '970431':'eib','970449':'lpb'
 };
 let currentBankPayment=null;
+const SUPPORTED_BANK_APPS=[
+ {id:'icb',name:'VietinBank iPay'},
+ {id:'bidv',name:'BIDV SmartBanking'},
+ {id:'ocb',name:'OCB OMNI'},
+ {id:'acb',name:'ACB ONE'},
+ {id:'mb',name:'MB Bank'}
+];
+function bankTransferText(value){
+ return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/[đĐ]/g,c=>c==='đ'?'d':'D')
+  .replace(/[^a-zA-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
+}
 function buildBankAppUrl(app){
  const p=currentBankPayment;
  if(!p||!BANK_DEEPLINK_CODES[p.bank_bin])return null;
@@ -198,22 +231,41 @@ function buildBankAppUrl(app){
  u.searchParams.set('app',app);
  u.searchParams.set('ba',p.account+'@'+BANK_DEEPLINK_CODES[p.bank_bin]);
  u.searchParams.set('am',String(p.amount));
- u.searchParams.set('tn',p.note);
- if(p.owner)u.searchParams.set('bn',p.owner);
- u.searchParams.set('url','https://www.vietqr.io/deeplink');
+ u.searchParams.set('tn',bankTransferText(p.note));
+ if(p.owner)u.searchParams.set('bn',bankTransferText(p.owner));
+ const backUrl=new URL(location.protocol==='https:'?location.origin+location.pathname:'https://trachieu.github.io/VCC/');
+ backUrl.searchParams.set('vcc_return','1');
+ u.searchParams.set('url',backUrl.toString());
  return u.toString();
 }
-function refreshBankAppLink(){
- const link=buildBankAppUrl($('payerBankApp').value);
- if(link){$('goBankApp').href=link;}else{$('goBankApp').removeAttribute('href');}
+function renderSupportedBankApps(){
+ const root=$('supportedBankApps');
+ root.replaceChildren();
+ for(const bank of SUPPORTED_BANK_APPS){
+  const button=document.createElement('button');
+  button.className='bank-app-item';button.type='button';
+  button.setAttribute('aria-label','Mở '+bank.name);
+  const img=document.createElement('img');
+  img.src='https://cdn.vietqr.io/bank-app-icon/'+bank.id+'-android.webp';
+  img.alt='';img.loading='lazy';
+  img.onerror=()=>{img.style.display='none';};
+  const label=document.createElement('span');label.textContent=bank.name;
+  button.append(img,label);
+  button.onclick=()=>{
+   const url=buildBankAppUrl(bank.id);
+   if(!url){notify('Không tạo được liên kết ngân hàng. Hãy sử dụng mã QR phía trên.',true);return;}
+   saveBankReturnState();
+   window.location.assign(url);
+  };
+  root.append(button);
+ }
 }
 $('openBankApp').onclick=()=>{
  if(!currentBankPayment)return;
- $('bankAppChoice').classList.remove('hidden');refreshBankAppLink();
+ renderSupportedBankApps();
+ $('bankAppChoice').classList.remove('hidden');
 };
 $('closeBankChoice').onclick=()=>$('bankAppChoice').classList.add('hidden');
-$('payerBankApp').onchange=refreshBankAppLink;
-$('goBankApp').onclick=e=>{if(!buildBankAppUrl($('payerBankApp').value)){e.preventDefault();notify('Ngân hàng nhận tiền chưa hỗ trợ mở ứng dụng. Hãy dùng mã QR.',true)}};
 // Đọc thông tin nhận tiền mới nhất ở mỗi lần mở thanh toán.
 function paymentNote(o){const owner=members.find(m=>m.id===o.member_id);return ((owner?.name || person?.name || 'Nhan vien').trim()+' chuyen khoan').slice(0,100)}
 async function showPayment(o){
@@ -222,11 +274,11 @@ async function showPayment(o){
  if(!Number.isInteger(amount)||amount<=0)return notify('Số tiền đơn không hợp lệ',true);
  const note=paymentNote(o);
  $('payModal').classList.remove('hidden');
- currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');$('goBankApp').removeAttribute('href');
+ currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');
  $('payAmount').textContent=money(amount);
  $('payNote').textContent=note;
  $('payBank').textContent='';$('payOwner').textContent='';$('payAccount').textContent='';
- $('payQr').removeAttribute('src');$('payQrLink').removeAttribute('href');
+ $('payQr').removeAttribute('src');
  $('qrIssue').textContent='Đang tải thông tin chuyển khoản…';
  try{
   // Đợt còn mở: dùng STK đang cấu hình. Đợt đã khóa/kết thúc: dùng STK chốt lúc khóa.
@@ -265,20 +317,17 @@ async function showPayment(o){
   $('payOwner').textContent=data.account_name;
   $('payAccount').textContent=data.account_number;
   $('qrIssue').textContent='';
-  $('payQrLink').href=url;
   $('payQr').src=url;
-  currentBankPayment={bank_bin:data.bank_bin,account:data.account_number,owner:data.account_name,amount,note};
+  currentBankPayment={bank_bin:data.bank_bin,account:data.account_number,owner:data.account_name,amount,note,orderId:o.id};
   $('openBankApp').disabled=!BANK_DEEPLINK_CODES[data.bank_bin];
-  refreshBankAppLink();
+  
  }catch(e){
-  currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');$('goBankApp').removeAttribute('href');
+  currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');
   $('qrIssue').textContent=e.message||'Không tải được thông tin chuyển khoản. Vui lòng báo quản trị.';
-  $('payQrLink').removeAttribute('href');
  }
 }
 $('payQr').onerror=()=>{$('qrIssue').textContent='Không tải được ảnh QR. Bạn có thể dùng thông tin chuyển khoản bên dưới.'};
 $('closePay').onclick=()=>{$('payModal').classList.add('hidden');$('bankAppChoice').classList.add('hidden');currentBankPayment=null;};
-$('copyPayNote').onclick=async()=>{try{await navigator.clipboard.writeText($('payNote').textContent);notify('Đã sao chép nội dung chuyển khoản')}catch(e){notify('Hãy sao chép nội dung thủ công',true)}};
 function renderOrders(){
  if(!person){$('ordersList').innerHTML='<p>Chưa chọn nhân viên.</p>';return}
  const mine=myOrders.filter(o=>o.member_id===person.id);
