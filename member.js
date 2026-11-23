@@ -58,42 +58,45 @@ function saveBankReturnState(){
  try{localStorage.setItem(BANK_RETURN_KEY,JSON.stringify({userId:activeUser,memberId:person.id,orderId:currentBankPayment.orderId,time:Date.now()}));}catch(_){}
 }
 async function restoreBankReturnState(){
- // Không thể chứng minh giao dịch thành công từ URL quay về VietQR.
- // Trang báo lỗi không mở được ngân hàng cũng có nút quay về tương tự.
+ // Callback VietQR chỉ cho biết đã quay lại. Không phải xác nhận giao dịch từ ngân hàng.
  const params=new URLSearchParams(location.search);
  const returnValue=params.get('vcc_return')||'';
  if(!/^1(?:$|[?&])/.test(returnValue))return;
+ const embeddedStatus=(returnValue.match(/[?&]status=([^&]+)/)||[])[1]||'';
+ const status=(params.get('status')||embeddedStatus).toLowerCase();
  let pending=null;
  try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null');}catch(_){}
- // Xóa dấu quay về ngay: tải lại trang không được xử lý lặp.
  try{
   const u=new URL(location.href);
   u.searchParams.delete('vcc_return');u.searchParams.delete('status');
   history.replaceState(null,'',u.pathname+u.search+u.hash);
  }catch(_){}
- try{localStorage.removeItem(BANK_RETURN_KEY)}catch(_){}
- if(!isMobileBankDevice()){
-  notify('Trên máy tính, hãy quét QR bằng điện thoại. Đơn chưa được xác nhận thanh toán.');
-  return;
- }
- if(!pending || pending.userId!==activeUser || !pending.memberId || !pending.orderId ||
-    !Number.isFinite(pending.time) || Date.now()-pending.time>20*60*1000 || Date.now()<pending.time){
-  if(!person&&restoreMember())await showApp('myOrdersSection');
-  notify('Đã quay về VCC. Nếu ứng dụng ngân hàng không mở được, hãy quét mã QR. Đơn chưa được xác nhận thanh toán.',true);
-  return;
- }
- const matchingMember=members.find(m=>m.id===pending.memberId);
- if(!matchingMember){
-  notify('Nhân viên không còn tồn tại. Trạng thái thanh toán chưa thay đổi.',true);
-  return;
- }
+ try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
+ // Các trạng thái lỗi rõ ràng không được ghi nhận.
+ const failed=['failed','failure','error','cancel','cancelled','canceled','0','false'];
+ if(!isMobileBankDevice() || failed.includes(status))return;
+ if(!pending||pending.userId!==activeUser||!pending.memberId||!pending.orderId||
+    !Number.isFinite(pending.time)||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
+ const matchingMember=members.find(m=>m.id===pending.memberId&&m.active);
+ if(!matchingMember)return;
  person=matchingMember;
  await showApp('myOrdersSection');
  const order=myOrders.find(o=>o.id===pending.orderId&&o.member_id===person.id);
- if(!order){notify('Không tìm thấy đơn đã mở thanh toán.',true);return;}
- // Không gọi member_confirm_payment_return: một lượt quay về có thể đến từ trang lỗi.
- notify(order.paid?'Đơn đã được Admin xác nhận thanh toán.':'Đã quay về VCC. Nếu ứng dụng ngân hàng không mở được, hãy dùng mã QR; nếu đã chuyển tiền, Admin sẽ kiểm tra và xác nhận.');
+ if(!order||order.paid)return;
+ try{
+  const {data,error}=await sb.rpc('member_confirm_payment_return',{
+   p_order:order.id,p_member:person.id
+  });
+  if(error)throw error;
+  if(data!==true)throw Error('Không thể cập nhật trạng thái thanh toán.');
+  await loadOrders();
+  showSection('myOrdersSection');
+ }catch(e){
+  // Chỉ hiện lỗi ngắn khi Supabase từ chối; không hiện banner quay về.
+  notify('Không cập nhật được thanh toán: '+e.message,true);
+ }
 }
+
 async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();if(!person&&restoreMember())await showApp('myOrdersSection');}catch(e){notify('Không kết nối được: '+e.message,true)}}
 async function reload(){[members,restaurants,menu,toppingOptions]=await Promise.all([query('members'),query('restaurants'),query('menu_items'),query('toppings')]);members=members.filter(x=>x.active);restaurants=restaurants.filter(x=>x.active);menu=menu.filter(x=>x.active);allRounds=await query('order_rounds');round=allRounds.filter(x=>x.status!=='archived').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]||null;memberDeadlineTick();renderNames();if(person){const latest=members.find(x=>x.id===person.id);if(!latest){resetToLogin();return}person=latest;const currentlyVisible=['restaurantsSection','menuSection','myOrdersSection'].find(id=>!$(id).classList.contains('hidden'));await showApp(currentlyVisible)}}
 function renderNames(){

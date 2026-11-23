@@ -1,0 +1,6 @@
+VCC V16.62 – bỏ banner quay về, bật lại tự tích khi quay về điện thoại.
+1. Nếu đang dùng V16.61, chỉ thay member.js và index.html.
+2. Nếu trước đây đã chạy SUPABASE_CHAN_XAC_NHAN_NHAM_V16_60.sql, vào SQL Editor chạy SUPABASE_BAT_LAI_TU_TICH_V16_62.sql (yêu cầu RPC của V16.56 đã tồn tại).
+3. Tải lại trang và thử. Admin có thể bỏ tích nếu chưa nhận tiền.
+CẢNH BÁO: VietQR callback KHÔNG xác nhận giao dịch thành công. Trang mở app thất bại cũng có thể quay lại. Điều này có thể gây sai lệch công nợ.
+Không tự chạy lại các file SQL khởi tạo cũ.
