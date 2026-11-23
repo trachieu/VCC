@@ -50,6 +50,14 @@ setInterval(memberDeadlineTick,1000);
 
 // Chỉ lưu tạm đơn đang thanh toán để khôi phục giao diện khi ngân hàng quay lại.
 const BANK_RETURN_KEY='vcc_bank_return_pending_v1654';
+const BANK_CALLBACK_LOG_KEY='vcc_bank_callback_log_v1663';
+function renderBankCallbackLog(){
+ const out=document.getElementById('bankCallbackLog');
+ if(!out)return;
+ let info=null;try{info=JSON.parse(localStorage.getItem(BANK_CALLBACK_LOG_KEY)||'null')}catch(_){}
+ out.textContent=info?JSON.stringify(info,null,2):'Chưa có dữ liệu quay về từ VietQR.';
+}
+
 // Deeplink ngân hàng chỉ chạy trên thiết bị di động. Trên PC dùng QR để tránh ghi nhận nhầm.
 function isMobileBankDevice(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);}
 
@@ -58,46 +66,29 @@ function saveBankReturnState(){
  try{localStorage.setItem(BANK_RETURN_KEY,JSON.stringify({userId:activeUser,memberId:person.id,orderId:currentBankPayment.orderId,time:Date.now()}));}catch(_){}
 }
 async function restoreBankReturnState(){
- // Callback VietQR chỉ cho biết đã quay lại. Không phải xác nhận giao dịch từ ngân hàng.
+ // V16.63: chỉ quan sát callback. Trang lỗi, status=1 và callback không đủ xác minh giao dịch.
  const params=new URLSearchParams(location.search);
  const returnValue=params.get('vcc_return')||'';
  if(!/^1(?:$|[?&])/.test(returnValue))return;
- const embeddedStatus=(returnValue.match(/[?&]status=([^&]+)/)||[])[1]||'';
- const status=(params.get('status')||embeddedStatus).toLowerCase();
  let pending=null;
- try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null');}catch(_){}
+ try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null')}catch(_){}
  try{
   const u=new URL(location.href);
-  u.searchParams.delete('vcc_return');u.searchParams.delete('status');
+  for(const key of ['vcc_return','vcc_callback','status'])u.searchParams.delete(key);
   history.replaceState(null,'',u.pathname+u.search+u.hash);
  }catch(_){}
- try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
- // Các trạng thái lỗi rõ ràng không được ghi nhận.
- const failed=['failed','failure','error','cancel','cancelled','canceled','0','false'];
- if(!isMobileBankDevice() || failed.includes(status))return;
+ try{localStorage.removeItem(BANK_RETURN_KEY)}catch(_){}
  if(!pending||pending.userId!==activeUser||!pending.memberId||!pending.orderId||
     !Number.isFinite(pending.time)||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
  const matchingMember=members.find(m=>m.id===pending.memberId&&m.active);
  if(!matchingMember)return;
  person=matchingMember;
  await showApp('myOrdersSection');
- const order=myOrders.find(o=>o.id===pending.orderId&&o.member_id===person.id);
- if(!order||order.paid)return;
- try{
-  const {data,error}=await sb.rpc('member_confirm_payment_return',{
-   p_order:order.id,p_member:person.id
-  });
-  if(error)throw error;
-  if(data!==true)throw Error('Không thể cập nhật trạng thái thanh toán.');
-  await loadOrders();
-  showSection('myOrdersSection');
- }catch(e){
-  // Chỉ hiện lỗi ngắn khi Supabase từ chối; không hiện banner quay về.
-  notify('Không cập nhật được thanh toán: '+e.message,true);
- }
+ renderBankCallbackLog();
+ // Không gọi member_confirm_payment_return: nút quay lại không xác thực chuyển khoản.
 }
 
-async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();if(!person&&restoreMember())await showApp('myOrdersSection');}catch(e){notify('Không kết nối được: '+e.message,true)}}
+async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();if(!person&&restoreMember())await showApp('myOrdersSection');renderBankCallbackLog();}catch(e){notify('Không kết nối được: '+e.message,true)}}
 async function reload(){[members,restaurants,menu,toppingOptions]=await Promise.all([query('members'),query('restaurants'),query('menu_items'),query('toppings')]);members=members.filter(x=>x.active);restaurants=restaurants.filter(x=>x.active);menu=menu.filter(x=>x.active);allRounds=await query('order_rounds');round=allRounds.filter(x=>x.status!=='archived').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]||null;memberDeadlineTick();renderNames();if(person){const latest=members.find(x=>x.id===person.id);if(!latest){resetToLogin();return}person=latest;const currentlyVisible=['restaurantsSection','menuSection','myOrdersSection'].find(id=>!$(id).classList.contains('hidden'));await showApp(currentlyVisible)}}
 function renderNames(){
  let q=norm($('personSearch').value.trim());
@@ -110,6 +101,7 @@ function renderNames(){
 $('personSearch').oninput=()=>{person=null;$('goBtn').disabled=true;$('selectedName').textContent='Chưa chọn tên';renderNames()};
 $('personSearch').onfocus=()=>{if($('personSearch').value.trim())renderNames()};
 function resetToLogin(){try{localStorage.removeItem(BANK_RETURN_KEY);localStorage.removeItem(MEMBER_LOGIN_KEY)}catch(_){}person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');currentBankPayment=null;$('bankAppChoice').classList.add('hidden');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
+$('copyBankCallbackLog').onclick=async()=>{const content=$('bankCallbackLog').textContent;try{await navigator.clipboard.writeText(content);notify('Đã sao chép nhật ký VietQR')}catch(_){prompt('Sao chép nhật ký',content)}};
 $('goBtn').onclick=()=>showApp();$('changePerson').onclick=resetToLogin;
 async function showApp(keepSection){if(!person)return; rememberMember();$('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
 function showSection(id){for(let s of ['restaurantsSection','menuSection','myOrdersSection'])$(s).classList.toggle('hidden',s!==id);$('memberSidebar').classList.toggle('hidden',id!=='myOrdersSection')}
@@ -279,7 +271,9 @@ function buildBankAppUrl(app){
  if(p.owner)u.searchParams.set('bn',bankTransferText(p.owner));
  const backUrl=new URL(location.protocol==='https:'?location.origin+location.pathname:'https://trachieu.github.io/VCC/');
  backUrl.searchParams.set('vcc_return','1');
- u.searchParams.set('url',backUrl.toString());
+ const callbackUrl=new URL('return.html',location.href);
+ callbackUrl.searchParams.set('vcc_return','1');
+ u.searchParams.set('url',callbackUrl.toString());
  return u.toString();
 }
 function renderSupportedBankApps(){
@@ -300,6 +294,8 @@ function renderSupportedBankApps(){
    const url=buildBankAppUrl(bank.id);
    if(!url){notify('Không tạo được liên kết ngân hàng. Hãy sử dụng mã QR phía trên.',true);return;}
    saveBankReturnState();
+   try{localStorage.setItem(BANK_CALLBACK_LOG_KEY,JSON.stringify({launchedAt:new Date().toISOString(),app:bank.name,expectedReturn:new URL('return.html',location.href).href,result:'Chưa ghi nhận callback từ VietQR'}))}catch(_){}
+   renderBankCallbackLog();
    window.location.assign(url);
   };
   root.append(button);

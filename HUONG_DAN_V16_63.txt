@@ -1,0 +1,8 @@
+VCC V16.63 — tích hợp thử nghiệm kiểm tra callback VietQR lên bản chính V16.62.
+- Tải toàn bộ file lên thư mục gốc GitHub Pages của VCC.
+- Không cần chạy SQL mới.
+- Mở đơn của tôi > Kiểm tra lượt quay về VietQR > Sao chép nhật ký.
+- Thử ngân hàng đã cài và chưa cài, gửi cả hai nhật ký để so sánh.
+- Thời gian thử: website KHÔNG tự tích Đã thanh toán khi quay về từ VietQR, kể cả status=1.
+- Nếu sau này cần tự xác minh đã nhận tiền, cần nguồn xác thực giao dịch.
+- File return.html chỉ phân loại khi callback có dấu hiệu lỗi tường minh, không nhận dạng được app có cài hay chưa nếu VietQR không trả thông tin.
