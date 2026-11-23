@@ -44,7 +44,7 @@ function renderNames(){
 }
 $('personSearch').oninput=()=>{person=null;$('goBtn').disabled=true;$('selectedName').textContent='Chưa chọn tên';renderNames()};
 $('personSearch').onfocus=()=>{if($('personSearch').value.trim())renderNames()};
-function resetToLogin(){person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
+function resetToLogin(){person=null;restaurant=null;selectedItem=null;myOrders=[];cart=[];editingCartIndex=-1;editingOrderId=null;returnToCartAfterItemEdit=false;['itemModal','cartModal','payModal'].forEach(id=>$(id).classList.add('hidden'));$('payQr').removeAttribute('src');currentBankPayment=null;$('bankAppChoice').classList.add('hidden');$('hello').textContent='';$('app').classList.add('hidden');$('sticky').classList.add('hidden');$('login').classList.remove('hidden');$('personSearch').value='';$('selectedName').textContent='Chưa chọn tên';$('goBtn').disabled=true;$('changePerson').classList.add('hidden');$('hintList').innerHTML='';$('hintList').classList.add('hidden');$('memberSidebar').classList.add('hidden');renderOrders();renderCart()}
 $('goBtn').onclick=()=>showApp();$('changePerson').onclick=resetToLogin;
 async function showApp(keepSection){if(!person)return; $('login').classList.add('hidden');$('app').classList.remove('hidden');$('sticky').classList.remove('hidden');$('changePerson').classList.remove('hidden');$('hello').textContent='Xin chào, '+person.name;$('welcome').textContent='Xin chào, '+person.name;renderRestaurants();memberDeadlineTick();await loadOrders();if(!person||$('app').classList.contains('hidden'))return;showSection(keepSection||'myOrdersSection');renderCart()}
 function showSection(id){for(let s of ['restaurantsSection','menuSection','myOrdersSection'])$(s).classList.toggle('hidden',s!==id);$('memberSidebar').classList.toggle('hidden',id!=='myOrdersSection')}
@@ -181,6 +181,39 @@ async function loadOrders(){
  myOrders=(data||[]).filter(o=>o.member_id===selectedId);
  renderOrders();
 }
+// Chỉ dùng thông tin tài khoản đã xác định từ đúng đợt đặt hàng để mở ứng dụng ngân hàng.
+const BANK_DEEPLINK_CODES={
+ '970432':'vpb','970436':'vcb','970418':'bidv','970415':'icb',
+ '970422':'mb','970407':'tcb','970416':'acb','970423':'tpb',
+ '970405':'agr','970403':'stb','970437':'hdb','970448':'ocb',
+ '970443':'shb','970441':'vib','970426':'msb','970429':'scb',
+ '970431':'eib','970449':'lpb'
+};
+let currentBankPayment=null;
+function buildBankAppUrl(app){
+ const p=currentBankPayment;
+ if(!p||!BANK_DEEPLINK_CODES[p.bank_bin])return null;
+ if(!/^[0-9]{4,25}$/.test(p.account)||!Number.isSafeInteger(p.amount)||p.amount<=0)return null;
+ const u=new URL('https://dl.vietqr.io/pay');
+ u.searchParams.set('app',app);
+ u.searchParams.set('ba',p.account+'@'+BANK_DEEPLINK_CODES[p.bank_bin]);
+ u.searchParams.set('am',String(p.amount));
+ u.searchParams.set('tn',p.note);
+ if(p.owner)u.searchParams.set('bn',p.owner);
+ u.searchParams.set('url','https://www.vietqr.io/deeplink');
+ return u.toString();
+}
+function refreshBankAppLink(){
+ const link=buildBankAppUrl($('payerBankApp').value);
+ if(link){$('goBankApp').href=link;}else{$('goBankApp').removeAttribute('href');}
+}
+$('openBankApp').onclick=()=>{
+ if(!currentBankPayment)return;
+ $('bankAppChoice').classList.remove('hidden');refreshBankAppLink();
+};
+$('closeBankChoice').onclick=()=>$('bankAppChoice').classList.add('hidden');
+$('payerBankApp').onchange=refreshBankAppLink;
+$('goBankApp').onclick=e=>{if(!buildBankAppUrl($('payerBankApp').value)){e.preventDefault();notify('Ngân hàng nhận tiền chưa hỗ trợ mở ứng dụng. Hãy dùng mã QR.',true)}};
 // Đọc thông tin nhận tiền mới nhất ở mỗi lần mở thanh toán.
 function paymentNote(o){const owner=members.find(m=>m.id===o.member_id);return ((owner?.name || person?.name || 'Nhan vien').trim()+' chuyen khoan').slice(0,100)}
 async function showPayment(o){
@@ -189,6 +222,7 @@ async function showPayment(o){
  if(!Number.isInteger(amount)||amount<=0)return notify('Số tiền đơn không hợp lệ',true);
  const note=paymentNote(o);
  $('payModal').classList.remove('hidden');
+ currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');$('goBankApp').removeAttribute('href');
  $('payAmount').textContent=money(amount);
  $('payNote').textContent=note;
  $('payBank').textContent='';$('payOwner').textContent='';$('payAccount').textContent='';
@@ -233,13 +267,17 @@ async function showPayment(o){
   $('qrIssue').textContent='';
   $('payQrLink').href=url;
   $('payQr').src=url;
+  currentBankPayment={bank_bin:data.bank_bin,account:data.account_number,owner:data.account_name,amount,note};
+  $('openBankApp').disabled=!BANK_DEEPLINK_CODES[data.bank_bin];
+  refreshBankAppLink();
  }catch(e){
+  currentBankPayment=null;$('openBankApp').disabled=true;$('bankAppChoice').classList.add('hidden');$('goBankApp').removeAttribute('href');
   $('qrIssue').textContent=e.message||'Không tải được thông tin chuyển khoản. Vui lòng báo quản trị.';
   $('payQrLink').removeAttribute('href');
  }
 }
 $('payQr').onerror=()=>{$('qrIssue').textContent='Không tải được ảnh QR. Bạn có thể dùng thông tin chuyển khoản bên dưới.'};
-$('closePay').onclick=()=>$('payModal').classList.add('hidden');
+$('closePay').onclick=()=>{$('payModal').classList.add('hidden');$('bankAppChoice').classList.add('hidden');currentBankPayment=null;};
 $('copyPayNote').onclick=async()=>{try{await navigator.clipboard.writeText($('payNote').textContent);notify('Đã sao chép nội dung chuyển khoản')}catch(e){notify('Hãy sao chép nội dung thủ công',true)}};
 function renderOrders(){
  if(!person){$('ordersList').innerHTML='<p>Chưa chọn nhân viên.</p>';return}

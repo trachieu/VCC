@@ -222,3 +222,11 @@ main{width:100%;max-width:1240px;padding-left:clamp(14px,2.6vw,30px);padding-rig
 /* Giữ dòng trạng thái và thời gian khóa gọn trên màn hình nhỏ */
 #roundInfo{display:inline-block;font-variant-numeric:tabular-nums;line-height:1.5;white-space:normal}
 #sidebarRoundStatus{font-variant-numeric:tabular-nums}
+
+/* V16.52: chọn ứng dụng ngân hàng ngay trong thanh toán */
+.bank-app-choice{margin:15px 0 4px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#f4f8f5;text-align:left}
+.bank-app-choice label{display:block;margin:12px 0 6px;font-weight:650}
+.bank-app-choice select{width:100%;background:white}
+.bank-app-go{display:block;margin-top:12px;padding:13px 16px;border-radius:10px;background:var(--g);color:white;text-align:center;text-decoration:none;font-weight:700}
+.bank-app-go:not([href]),.bank-app-go[href="#"]{pointer-events:none;opacity:.5}
+.bank-app-choice .muted{margin:12px 0 0}
