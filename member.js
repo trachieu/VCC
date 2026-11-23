@@ -41,32 +41,40 @@ function saveBankReturnState(){
 async function restoreBankReturnState(){
  // Chỉ ghi nhận khi VietQR đưa người dùng quay về đúng URL callback.
  const params=new URLSearchParams(location.search);
- if(params.get('vcc_return')!=='1')return;
+ // Một số ứng dụng ngân hàng nối thêm '?status=1' vào URL đã có query.
+ // Khi đó vcc_return trở thành '1?status=1', vẫn là lượt quay về hợp lệ.
+ const returnValue=params.get('vcc_return')||'';
+ if(!/^1(?:$|[?&])/.test(returnValue))return;
  let pending=null;
  try{pending=JSON.parse(localStorage.getItem(BANK_RETURN_KEY)||'null');}catch(_){}
- try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
  // Xóa tham số callback để reload trang không vô tình xử lý lại.
- try{const u=new URL(location.href);u.searchParams.delete('vcc_return');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(_){}
- if(!pending||pending.userId!==activeUser||!pending.memberId||!pending.orderId||
-    !Number.isFinite(pending.time)||Date.now()-pending.time>20*60*1000||Date.now()<pending.time)return;
+ try{const u=new URL(location.href);u.searchParams.delete('vcc_return');u.searchParams.delete('status');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(_){}
+ if(!pending){notify('Không khôi phục được đơn thanh toán trên trình duyệt này. Vui lòng mở lại Đơn của tôi.',true);return;}
+ if(pending.userId!==activeUser||!pending.memberId||!pending.orderId||
+    !Number.isFinite(pending.time)||Date.now()-pending.time>20*60*1000||Date.now()<pending.time){
+   try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
+   notify('Phiên thanh toán không còn hợp lệ. Vui lòng chọn lại đơn.',true);return;
+ }
+ // Chỉ dùng trạng thái trả về để xác định thao tác quay về; không xác minh tiền đã về.
  const matchingMember=members.find(m=>m.id===pending.memberId);
- if(!matchingMember)return;
+ if(!matchingMember){notify('Không tìm thấy nhân viên của đơn vừa mở thanh toán.',true);return;}
  person=matchingMember;
  await showApp('myOrdersSection');
  const order=myOrders.find(o=>o.id===pending.orderId&&o.member_id===person.id);
  if(!order){notify('Không tìm thấy đơn vừa mở thanh toán.',true);return;}
- if(order.paid){notify('Đơn đã được đánh dấu thanh toán');return;}
+ if(order.paid){try{localStorage.removeItem(BANK_RETURN_KEY)}catch(_){}notify('Đơn đã được đánh dấu thanh toán');return;}
  try{
   const {data,error}=await sb.rpc('member_confirm_payment_return',{
    p_order:pending.orderId,p_member:pending.memberId
   });
   if(error)throw error;
   if(data!==true)throw Error('Không thể cập nhật đơn hoặc phiên đặt đơn không còn hợp lệ.');
+  try{localStorage.removeItem(BANK_RETURN_KEY);}catch(_){}
   await loadOrders();
   notify('Đã đánh dấu thanh toán');
  }catch(e){
   notify('Chưa thể đánh dấu thanh toán: '+e.message,true);
-  // Khi thất bại, giữ màn hình đơn hàng để người dùng thử lại qua QR / báo Admin.
+  // Khi thất bại, giữ màn hình đơn hàng và trạng thái chờ để có thể kiểm tra lại.
  }
 }
 async function init(){try{$('hintList').classList.add('hidden');let {data:{session}}=await sb.auth.getSession();if(!session){let r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}activeUser=session.user.id;await reload();await restoreBankReturnState();}catch(e){notify('Không kết nối được: '+e.message,true)}}
