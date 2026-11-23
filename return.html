@@ -1,20 +1,18 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VCC · Đang quay lại</title></head><body><p>Đang quay lại VCC…</p><script>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quay về VCC</title></head><body><p>Đang quay về VCC…</p><script>
 (function(){
- const KEY='vcc_bank_callback_log_v1663';
  const u=new URL(location.href), raw=u.search+u.hash;
- const entries=Array.from(u.searchParams.entries());
  const embedded=[...raw.matchAll(/(?:[?&])status=([^&#]+)/gi)].map(m=>m[1]);
  const failures=[];
- for(const [k,v] of entries){
-  if(/^(error|err|error_code|errorcode|failed|failure)$/i.test(k) && v && !/^(0|false|none|no|null)$/i.test(v))failures.push(k+'='+v);
-  if(/^(status|result|state|success)$/i.test(k) && /^(failed|failure|error|cancel|cancelled|canceled|reject|rejected|0|false)$/i.test(v))failures.push(k+'='+v);
+ for(const [k,v] of u.searchParams.entries()){
+  if(/^(error|err|error_code|errorcode|failed|failure)$/i.test(k)&&v&&!/^(0|false|none|no|null)$/i.test(v))failures.push(k);
+  if(/^(status|result|state|success)$/i.test(k)&&/^(failed|failure|error|cancel|cancelled|canceled|reject|rejected|0|false)$/i.test(v))failures.push(k);
  }
- for(const value of embedded){if(/^(failed|failure|error|cancel|cancelled|canceled|0|false)$/i.test(value))failures.push('status='+value)}
- let previous={};try{previous=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){}
- const result={...previous,returnedAt:new Date().toISOString(),callbackUrl:u.href,callbackParameters:entries,embeddedStatus:embedded,errorSignals:failures,result:failures.length?'Có tín hiệu lỗi rõ ràng':'Không xác định (không có bằng chứng thanh toán)'};
- try{localStorage.setItem(KEY,JSON.stringify(result))}catch(_){}
- const target=new URL(failures.length?'failed.html':'index.html',u.href);
- if(!failures)target.searchParams.set('vcc_return','1');
+ if(embedded.some(v=>/^(failed|failure|error|cancel|cancelled|canceled|0|false)$/i.test(v)))failures.push('status');
+ const status=u.searchParams.get('status')||embedded[0]||'';
+ const target=new URL('index.html',u.href);
+ target.searchParams.set('vcc_return','1');
+ if(failures.length)target.searchParams.set('vcc_failed','1');
+ else if(status==='1')target.searchParams.set('vcc_status','1');
  location.replace(target.href);
 })();
 </script></body></html>

@@ -1,0 +1,6 @@
+VCC V16.64 – chỉ tự tích khi callback có status=1, bỏ thông báo và nhật ký thử nghiệm.
+1. Tải tất cả tệp của ZIP lên GitHub Pages ở thư mục gốc, ghi đè bản trước.
+2. Nếu đã chạy SQL khóa xác nhận ở V16.60, chạy SUPABASE_BAT_LAI_TU_TICH_V16_62.sql trong SQL Editor. Nếu chưa tạo RPC thì cần SQL SUPABASE_AUTO_PAID_RETURN.sql đã triển khai trước đó.
+3. Tải lại VCC và thử trên điện thoại.
+CẢNH BÁO: status=1 từ callback deeplink KHÔNG phải bằng chứng giao dịch ngân hàng. Có thể bị giả mạo hoặc do dịch vụ VietQR trả về không như dự kiến. Admin phải đối soát giao dịch thực tế. Đây là tự xác nhận theo callback, không phải xác thực tiền vào.
+Không chạy lại các SQL khởi tạo khác.
